@@ -1,0 +1,17 @@
+# 默认忽略的文件
+/shelf/
+/workspace.xml
+# 基于编辑器的 HTTP 客户端请求
+/httpRequests/
+# Datasource local storage ignored files
+/dataSources/
+/dataSources.local.xml
+
+/.idea/
+/YouDub-main
+/notes/my.md
+/notes/YouDub-讨论.md
+/notes/YouDub-文档更新说明-v1.1.md
+/notes/YouDub-项目文档.md
+/notes/image
+notes/YouDub-讨论共识记录.md
