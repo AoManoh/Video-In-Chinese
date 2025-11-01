@@ -102,7 +102,8 @@ Gateway服务依赖以下外部服务，服务启动时需确保这些依赖可�
 | 配置项                       | 类型              | 作用                                                                                           |
 | ---------------------------- | ----------------- | ---------------------------------------------------------------------------------------------- |
 | `GATEWAY_PORT`               | `integer`         | 指定服务监听的HTTP端口。                                                                       |
-| `LOCAL_STORAGE_PATH`         | `string`          | 指定用于存储临时文件和任务视频的根路径。                                                       |
+| `TEMP_STORAGE_PATH`          | `string`          | 指定用于存储上传临时文件的目录路径（与 Task 服务共享此配置项）。                               |
+| `LOCAL_STORAGE_PATH`         | `string`          | 指定用于存储任务视频的根路径（用于下载时拼接文件路径）。                                       |
 | `MAX_UPLOAD_SIZE_MB`         | `integer`         | 限制单个上传文件的最大体积（MB）。                                                             |
 | `SUPPORTED_MIME_TYPES`       | `[]string`        | 支持的视频文件MIME Type白名单 (例如: `["video/mp4", "video/quicktime", "video/x-matroska"]`)。 |
 | `API_KEY_ENCRYPTION_SECRET`  | `string` (32字节) | 用于API密钥加密，**必需**。                                                                    |
@@ -393,15 +394,17 @@ service gateway-api {
 
 **步骤 5：保存文件到临时目录**
 - 生成唯一的临时文件名（UUID）
-- 以流式方式将文件保存到 `{LOCAL_STORAGE_PATH}/temp/{uuid}.mp4`
+- 从 `original_filename` 提取文件扩展名（如 `.mp4`、`.mov`、`.mkv`）
+- 以流式方式将文件保存到 `{TEMP_STORAGE_PATH}/{uuid}{ext}`（保留原始扩展名）
+  - 示例：`original_filename="video.mov"` → 保存到 `{TEMP_STORAGE_PATH}/{uuid}.mov`
 - 使用 `io.Copy` 直接写入文件，避免将整个文件读入内存
 - **边界处理**：如果保存失败，清理临时文件，返回 `500 Internal Server Error`，错误信息："文件保存失败"
 
 **步骤 6：调用 Task 服务创建任务**
 - 通过 gRPC 调用 `task.CreateTask`
 - 传入参数：
-  - `temp_file_path`：`{LOCAL_STORAGE_PATH}/temp/{uuid}.mp4`（临时文件路径）
-  - `original_filename`：原始文件名（如 `video.mp4`）
+  - `temp_file_path`：`{TEMP_STORAGE_PATH}/{uuid}{ext}`（临时文件路径，包含实际扩展名）
+  - `original_filename`：原始文件名（如 `video.mov`）
 - **边界处理**：如果 gRPC 调用失败，清理临时文件，返回 `503 Service Unavailable`，错误信息："任务服务当前不可用，请稍后重试"
 
 **步骤 7：返回任务 ID**
@@ -423,22 +426,22 @@ service gateway-api {
 - **边界处理**：如果 gRPC 调用失败，返回 `503 Service Unavailable`，错误信息："任务服务当前不可用，请稍后重试"
 
 **步骤 3：接收 Task 服务响应**
-- 接收响应字段：
-  - `task_id`：任务 ID
-  - `status`：任务状态（pending、processing、completed、failed）
-  - `progress`：处理进度（0-100）
-  - `error_message`：错误信息（如果失败）
-  - `result_file_path`：结果文件路径（如果完成）
-  - `created_at`、`updated_at`：时间戳
+- 接收响应字段（根据 Task proto 定义）：
+  - `task_id`：任务 ID（string）
+  - `status`：任务状态（TaskStatus 枚举：UNKNOWN=0, PENDING=1, PROCESSING=2, COMPLETED=3, FAILED=4）
+  - `result_path`：结果文件路径（string，仅 COMPLETED 状态有值）
+  - `error_message`：错误信息（string，仅 FAILED 状态有值）
 
 **步骤 4：执行响应转换**
-- **状态映射**：将 Task 服务的内部状态转换为 API 契约定义的大写格式
-  - `pending` → `"PENDING"`
-  - `processing` → `"PROCESSING"`
-  - `completed` → `"COMPLETED"`
-  - `failed` → `"FAILED"`
-- **URL 生成**：如果任务状态为 `"COMPLETED"`，生成下载 URL
-  - 格式：`/v1/tasks/download/{task_id}/result.mp4`
+- **状态映射**：将 Task 服务的枚举状态转换为 API 契约定义的字符串格式
+  - `TaskStatus.PENDING` (1) → `"PENDING"`
+  - `TaskStatus.PROCESSING` (2) → `"PROCESSING"`
+  - `TaskStatus.COMPLETED` (3) → `"COMPLETED"`
+  - `TaskStatus.FAILED` (4) → `"FAILED"`
+  - `TaskStatus.UNKNOWN` (0) → `"UNKNOWN"`
+- **URL 生成**：如果任务状态为 `TaskStatus.COMPLETED`，生成下载 URL
+  - 从 `result_path` 提取文件名（如 `result.mp4`）
+  - 格式：`/v1/tasks/download/{task_id}/{filename}`
   - 示例：`/v1/tasks/download/abc123/result.mp4`
 
 **步骤 5：封装并返回**
@@ -470,8 +473,13 @@ service gateway-api {
 - **边界处理**：如果文件不存在，返回 `404 Not Found`，错误信息："文件不存在"
 
 **步骤 6：流式传输文件**
+- 根据文件扩展名检测 MIME 类型：
+  - `.mp4` → `video/mp4`
+  - `.mov` → `video/quicktime`
+  - `.mkv` → `video/x-matroska`
+  - 其他扩展名 → `application/octet-stream`（兜底）
 - 设置响应头：
-  - `Content-Type: video/mp4`（根据文件扩展名自动检测）
+  - `Content-Type: {detected_mime_type}`（根据上述规则动态设置）
   - `Content-Disposition: attachment; filename={fileName}`
   - `Accept-Ranges: bytes`（支持断点续传）
 - 使用 `io.Copy` 将文件流直接写入 `http.ResponseWriter`，避免将整个文件读入内存
@@ -676,14 +684,20 @@ sequenceDiagram
 ### **9.2 文件系统结构**
 
 ```
-{LOCAL_STORAGE_PATH}/
-├── temp/                          # 临时文件目录（Gateway 保存上传文件）
-│   └── {uuid}.mp4                 # 上传中的临时文件
-└── videos/                        # 任务文件目录（Task 服务管理）
-    └── {task_id}/                 # 每个任务独立目录
-        ├── original.mp4           # 原始视频文件
-        └── result.mp4             # 处理完成的视频文件
+{TEMP_STORAGE_PATH}/               # 临时文件目录（Gateway 上传文件）
+└── {uuid}.{ext}                   # 上传中的临时文件（保留原始扩展名）
+
+{LOCAL_STORAGE_PATH}/              # 任务文件目录（Task 服务管理）
+└── {task_id}/                     # 每个任务独立目录
+    ├── original.{ext}             # 原始视频文件（保留原始扩展名）
+    └── result.mp4                 # 处理完成的视频文件
 ```
+
+> 📝 **说明**：
+> - `{TEMP_STORAGE_PATH}` 和 `{LOCAL_STORAGE_PATH}` 是两个独立的配置项
+> - Gateway 使用 `{TEMP_STORAGE_PATH}` 保存上传文件
+> - Task 服务从 `{TEMP_STORAGE_PATH}` 读取临时文件,移动到 `{LOCAL_STORAGE_PATH}` 进行处理
+> - `{ext}` 表示原始文件扩展名（如 `.mp4`、`.mov`、`.mkv`）
 
 ---
 
@@ -784,17 +798,20 @@ sequenceDiagram
 -  Gateway-design.md 与 Base-Design.md v2.0 保持一致
 -  此差异已在 Base-Design.md v2.0 版本历史中记录
 
-#### **差异 3：临时目录路径表示**
+#### **差异 3：临时目录路径表示**（已废弃）
 
-| 对比项 | Base-Design.md（预览） | Gateway-design.md（最终契约） | 差异理由 |
-|-------|----------------------|----------------------------|---------|
-| **路径表示** | `{TEMP_STORAGE_PATH}/{uuid}.mp4` | `{LOCAL_STORAGE_PATH}/temp/{uuid}.mp4` | 第二层文档明确具体路径，便于开发实现 |
-| **抽象级别** | 使用占位符（更抽象） | 使用具体路径（更具体） | 第二层文档需要提供可直接实现的细节 |
+> ⚠️ **此差异已在 v5.9 版本中修复**：Gateway-design.md 现已与 Task-design.md 对齐，统一使用 `TEMP_STORAGE_PATH` 配置项。
+
+| 对比项 | Base-Design.md（预览） | Gateway-design.md v5.9（最终契约） | Task-design.md（最终契约） |
+|-------|----------------------|----------------------------------|---------------------------|
+| **路径表示** | `{TEMP_STORAGE_PATH}/{uuid}.mp4` | `{TEMP_STORAGE_PATH}/{uuid}.{ext}` | `{TEMP_STORAGE_PATH}` |
+| **配置项** | `TEMP_STORAGE_PATH` | `TEMP_STORAGE_PATH` | `TEMP_STORAGE_PATH` |
 
 **设计决策**：
--  采用具体路径：`{LOCAL_STORAGE_PATH}/temp/{uuid}.mp4`
--  在第 9.2 章"文件系统结构"中明确定义目录结构
--  在第 6.3 章"uploadTaskLogic"中使用具体路径
+-  统一使用 `TEMP_STORAGE_PATH` 配置项（与 Task-design.md 一致）
+-  保留原始文件扩展名：`{uuid}.{ext}`（而非强制 `.mp4`）
+-  在第 3.1 章"环境配置"中定义 `TEMP_STORAGE_PATH` 配置项
+-  在第 9.2 章"文件系统结构"中明确两个独立的存储路径
 
 #### **差异 4：关键逻辑步骤的粒度**
 
