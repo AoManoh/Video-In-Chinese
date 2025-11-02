@@ -1,12 +1,18 @@
 # Processor 服务设计文档（第二层）
 
-**文档版本**: 2.4
-**关联宏观架构**: `notes/Base-Design.md` v2.0
-**最后更新**: 2025-11-01
+**文档版本**: 2.5
+**关联宏观架构**: `notes/Base-Design.md` v2.1
+**最后更新**: 2025-11-02
 **服务定位**: Go 后台服务（无 gRPC 接口），负责 AI 流程编排和音频合成
 
 ## 版本历史
 
+- **v2.5 (2025-11-02)**:
+  - **职责补充**：新增步骤 6.5"音频片段切分"，明确由 Processor 负责切分音频片段
+  - **接口澄清**：更新步骤 6 的 ASR 输出格式，明确只返回时间戳（不返回 audio_segment_path）
+  - **流程完善**：更新步骤 10 的声音克隆输入，明确使用步骤 6.5 生成的 audio_segment_path
+  - **关联架构更新**：同步 Base-Design.md v2.1 的职责划分变更
+  - **目的**：澄清服务边界，符合单一职责原则
 - **v2.4 (2025-11-01)**:
   - **重大更新**：全面完善第二层文档质量，符合 design-rules.md 规范
   - 补充第 3 章"核心数据结构"：增加 Redis 数据结构和内存数据结构定义
@@ -404,8 +410,16 @@ func TaskPullLoop() {
 **步骤 6：ASR（语音识别）**
 - 调用 ai-adaptor 服务的 ASR 接口
 - 输入：`{LOCAL_STORAGE_PATH}/{task_id}/vocals.wav`
-- 输出：ASR 结果（包含文本和说话人日志）
+- 输出：ASR 结果（包含说话人列表、句子列表、时间戳）
+- 输出格式：`[{speaker_id, sentences: [{text, start_time, end_time}, ...]}, ...]`
 - **边界处理**：如果 ASR 失败，更新任务状态为 FAILED，错误信息："语音识别失败"
+
+**步骤 6.5：音频片段切分**
+- 根据 ASR 返回的时间戳，使用 ffmpeg 切分音频片段
+- 输入：`{LOCAL_STORAGE_PATH}/{task_id}/vocals.wav`、ASR 结果（时间戳）
+- 输出：音频片段文件列表，保存到 `{LOCAL_STORAGE_PATH}/{task_id}/segments/speaker_{speaker_id}_segment_{index}.wav`
+- 生成 `audio_segment_path` 列表，用于后续声音克隆
+- **边界处理**：如果切分失败，更新任务状态为 FAILED，错误信息："音频片段切分失败"
 
 **步骤 7：文本润色（可选）**
 - 检查配置：`polishing_enabled`
@@ -431,7 +445,10 @@ func TaskPullLoop() {
 
 **步骤 10：声音克隆**
 - 调用 ai-adaptor 服务的声音克隆接口
-- 输入：说话人日志、优化后的文本
+- 输入：
+  - `speaker_id`：说话人 ID
+  - `text`：翻译后的文本
+  - `reference_audio`：步骤 6.5 生成的 `audio_segment_path`（参考音频）
 - 输出：克隆后的音频片段列表（每个片段对应一个说话人的一句话）
 - **边界处理**：如果声音克隆失败，更新任务状态为 FAILED，错误信息："声音克隆失败"
 

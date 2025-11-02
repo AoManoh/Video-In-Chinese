@@ -1,12 +1,17 @@
 # AIAdaptor 服务设计文档（第二层）
 
-**文档版本**: 1.4
-**关联宏观架构**: `notes/Base-Design.md` v2.0
+**文档版本**: 1.5
+**关联宏观架构**: `notes/Base-Design.md` v2.1
 **最后更新**: 2025-11-02
 **服务定位**: Go gRPC 微服务，负责 AI 服务统一接口和适配器管理
 
 ## 版本历史
 
+- **v1.5 (2025-11-02)**:
+  - **接口契约更新**：修正 video_type 枚举值为详细格式（professional_tech, casual_natural, educational_rigorous, default）
+  - **职责澄清**：确认 ASR 接口不返回 audio_segment_path（音频片段切分由 Processor 负责）
+  - **关联架构更新**：同步 Base-Design.md v2.1 的职责划分变更
+  - **目的**：与 Base-Design.md v2.1 保持一致，符合单一职责原则
 - **v1.4 (2025-11-02)**:
   - **严重问题修复**：全面修复违反 design-rules.md 规范的伪代码问题
   - 修复第 4.2 节：移除适配器实现伪代码，改为支持的适配器清单（表格形式）
@@ -126,7 +131,7 @@ message Sentence {
 // 文本润色请求
 message PolishRequest {
   string text = 1;        // 原始文本
-  string video_type = 2;  // 视频类型（tech, casual, education, default）
+  string video_type = 2;  // 视频类型（professional_tech, casual_natural, educational_rigorous, default）
   string custom_prompt = 3; // 用户自定义 Prompt（可选）
 }
 
@@ -140,7 +145,7 @@ message TranslateRequest {
   string text = 1;        // 原始文本
   string source_lang = 2; // 源语言（默认 en）
   string target_lang = 3; // 目标语言（默认 zh）
-  string video_type = 4;  // 视频类型（tech, casual, education, default）
+  string video_type = 4;  // 视频类型（professional_tech, casual_natural, educational_rigorous, default）
 }
 
 // 翻译响应

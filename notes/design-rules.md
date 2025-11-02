@@ -133,10 +133,11 @@
 
 不应该包含：
 
-- 具体的 Go 代码实现，这部分内容应该下放到第三层次文档实现
+- 具体的 Go/Python 代码实现，这部分内容应该下放到第三层次文档实现
 - 详细的错误处理逻辑（try-catch）
 - 具体的第三方库选择（如 JSON 解析库）
 - 性能优化细节（如缓存策略）
+- **部署阶段文档**（Dockerfile、docker-compose.yml、requirements.txt、package.json 等）
 
 示例对比：
 
@@ -174,6 +175,159 @@ function uploadTaskLogic(req):
 - **为什么需要这个补充？**
 	- **设计即文档**: 这能让开发者在编码之前，就清晰地知道他需要依赖哪些外部配置，避免在代码中创造"魔法变量"。
 	- **方便运维和部署**: 这也为最终的部署文档（如.env.example文件）提供了直接的输入，确保了从设计到部署的一致性。
+
+---
+
+# 部署阶段文档约束
+
+## 1. 部署文档的定位
+
+**核心原则**：部署阶段的详细文档（Dockerfile、docker-compose.yml、requirements.txt、package.json 等）**不属于第二层和第三层文档的范围**，应该在项目完成后、到达部署阶段时专门撰写。
+
+## 2. 为什么要延迟到部署阶段？
+
+### 2.1 避免过早优化
+
+- **开发阶段**：重点是实现功能，验证设计的可行性
+- **部署阶段**：重点是优化镜像大小、构建速度、运行效率
+- 过早编写部署文档会导致频繁修改，浪费时间
+
+### 2.2 避免文档冗余
+
+- 部署文档（Dockerfile、docker-compose.yml）是**可执行的配置文件**，不是设计文档
+- 第二层和第三层文档应该专注于**设计决策**和**实现逻辑**，而非部署细节
+
+### 2.3 保持文档聚焦
+
+- 第二层文档：聚焦于**接口契约**和**关键逻辑步骤**
+- 第三层文档：聚焦于**核心实现决策**和**为什么这么写**
+- 部署文档：聚焦于**如何构建**和**如何运行**
+
+## 3. 第二层和第三层文档中如何处理部署相关内容？
+
+### 3.1 第二层文档（{服务名}-design.md）
+
+**可以包含**：
+- **部署要求概览**：基础镜像、系统依赖、暴露端口
+- **依赖清单概览**：主要依赖库及版本要求（表格形式）
+
+**不应该包含**：
+- 完整的 Dockerfile 内容
+- 完整的 requirements.txt / package.json 内容
+- docker-compose.yml 配置
+- 构建脚本
+
+**示例**（正确）：
+```markdown
+## 9. 部署要求
+
+> ⚠️ **注意**：部署阶段的详细文档（Dockerfile、docker-compose.yml、依赖清单等）将在项目完成后、到达部署阶段时专门撰写。本章仅说明部署要求和依赖概览。
+
+### 9.1 Docker 镜像要求
+
+- **基础镜像**: Python 3.9-slim
+- **系统依赖**: ffmpeg, libsndfile1
+- **Python 依赖**: grpcio, spleeter, tensorflow（详见第三层文档）
+- **暴露端口**: 50052（gRPC）
+
+### 9.2 依赖清单概览
+
+| 依赖库 | 版本要求 | 说明 |
+|--------|---------|------|
+| grpcio | >= 1.60.0 | gRPC 服务框架 |
+| spleeter | >= 2.4.0 | 音频分离模型 |
+| tensorflow | >= 2.13.0 | CPU 版本（默认） |
+
+> 📋 **详细的 Dockerfile、requirements.txt、构建说明**将在部署阶段专门撰写。
+```
+
+### 3.2 第三层文档（{服务名}-design-detail.md）
+
+**可以包含**：
+- **依赖库选型理由**：为什么选择这个库而不是那个库
+- **构建要求说明**：需要哪些构建工具、环境变量
+
+**不应该包含**：
+- 完整的 Dockerfile 内容
+- 完整的 requirements.txt / package.json 内容
+- docker-compose.yml 配置
+- 构建脚本
+
+**示例**（正确）：
+```markdown
+## 3. 依赖库清单（及选型原因）
+
+| 依赖库 | 版本 | 选型原因 |
+|--------|------|----------|
+| grpcio | 1.60.0 | 官方 gRPC Python 实现，稳定性好 |
+| spleeter | 2.4.0 | 开源音频分离模型，社区活跃 |
+| tensorflow | 2.13.0 | Spleeter 依赖，选择 CPU 版本降低部署门槛 |
+
+> 📋 **完整的 requirements.txt**将在部署阶段专门撰写。
+```
+
+## 4. 部署阶段文档的撰写时机
+
+**时机**：项目完成后，准备部署时
+
+**产出物**：
+- `deployment/Dockerfile`（各服务的 Dockerfile）
+- `deployment/docker-compose.yml`（服务编排配置）
+- `deployment/requirements.txt`（Python 依赖清单）
+- `deployment/package.json`（Node.js 依赖清单，如有）
+- `deployment/README.md`（部署说明文档）
+- `deployment/.env.example`（环境变量示例）
+
+**文档结构**：
+```
+deployment/
+├── README.md                    # 部署说明文档
+├── docker-compose.yml           # 服务编排配置
+├── .env.example                 # 环境变量示例
+├── gateway/
+│   └── Dockerfile
+├── task/
+│   └── Dockerfile
+├── processor/
+│   └── Dockerfile
+├── ai-adaptor/
+│   └── Dockerfile
+└── audio-separator/
+    ├── Dockerfile
+    └── requirements.txt
+```
+
+## 5. 部署文档的内容要求
+
+### 5.1 Dockerfile
+
+- 使用多阶段构建优化镜像大小
+- 明确标注每个步骤的作用（注释）
+- 使用 .dockerignore 排除不必要的文件
+- 设置合理的健康检查
+
+### 5.2 docker-compose.yml
+
+- 明确服务依赖关系（depends_on）
+- 配置健康检查（healthcheck）
+- 配置资源限制（CPU、内存）
+- 配置日志驱动（logging）
+- 配置网络和卷（networks、volumes）
+
+### 5.3 README.md（部署说明）
+
+- 前置要求（Docker、Docker Compose 版本）
+- 快速开始（一键部署命令）
+- 配置说明（环境变量、配置文件）
+- 常见问题（FAQ）
+- 故障排查（Troubleshooting）
+
+## 6. 总结
+
+- ✅ **第二层和第三层文档**：专注于设计和实现，只包含部署要求概览
+- ✅ **部署阶段文档**：专门撰写，包含完整的 Dockerfile、docker-compose.yml、依赖清单等
+- ✅ **撰写时机**：项目完成后、准备部署时
+- ✅ **文档位置**：`deployment/` 目录下
 
 ---
 
@@ -680,11 +834,13 @@ server/mcp/processor/
 - 说明选择该库的原因
 - 说明版本要求
 
-### 4. Dockerfile（及构建说明）
+### 4. 构建要求说明
 
-- 提供完整的 Dockerfile
-- 说明构建步骤
-- 说明运行要求
+> ⚠️ **注意**：根据"部署阶段文档约束"规则，完整的 Dockerfile 不应包含在第三层文档中，应在部署阶段专门撰写。
+
+- 说明构建工具要求（Go 版本、Python 版本等）
+- 说明构建依赖（系统库、编译工具等）
+- 说明运行要求（环境变量、配置文件等）
 
 ### 5. 测试策略与示例
 
@@ -722,7 +878,7 @@ server/mcp/processor/
    - 项目结构（仅列出关键文件和目录）
    - **核心实现决策与上下文**（解释"为什么这么写"）
    - 依赖库清单（及选型原因）
-   - Dockerfile（及构建说明）
+   - 构建要求说明（不包含完整 Dockerfile）
    - 测试策略与示例
    - 待实现任务清单
 
@@ -730,6 +886,20 @@ server/mcp/processor/
    - 记录所有重要的架构决策
    - 包含背景、考虑的方案、最终决策、决策理由
    - 为未来重构提供参考
+
+5. **部署阶段文档（deployment/）**:
+   - 在项目完成后、准备部署时专门撰写
+   - 包含完整的 Dockerfile、docker-compose.yml、依赖清单等
+   - 不在第二层和第三层文档中包含
+
+---
+
+# 文档变更历史
+
+| 版本 | 日期 | 变更内容 |
+|------|------|----------|
+| 1.1 | 2025-11-02 | **新增"部署阶段文档约束"章节**：明确 Dockerfile、docker-compose.yml、requirements.txt 等部署文档应在项目完成后、到达部署阶段时专门撰写，不在第二层和第三层文档中包含。更新第二层和第三层文档模板，移除部署文档相关内容。 |
+| 1.0 | 2025-10-30 | 初始版本 |
 
 ---
 

@@ -1,11 +1,16 @@
 # **1. 项目基石文档：视频翻译服务 (V1.0)**
 
-**文档版本**: 2.0
-**最后更新**: 2025年10月30日
+**文档版本**: 2.1
+**最后更新**: 2025年11月02日
 **负责人**: (AI技术合伙人)
 
 ## **版本历史**
 
+- **v2.1 (2025-11-02)**:
+  - **职责澄清**: 明确音频片段切分由 Processor 负责（新增步骤 7.5）
+  - **接口简化**: ASR 接口不再返回 `audio_segment_path`，只返回时间戳
+  - **注释更新**: 更新第 1.5 节注释，明确 `audio_segment_path` 由 Processor 生成
+  - **目的**: 澄清服务边界，符合单一职责原则
 - **v2.0 (2025-10-30)**:
   - **重大变更**: 移除第 2-4 章的冗余内容（API 定义、数据结构、详细逻辑步骤、流程图）
   - **保留内容**: 服务定位、核心职责、架构原则、接口能力概览、架构约束
@@ -208,11 +213,12 @@ video-translator/
 4. **文件准备**: 从本地文件存储读取原始视频。
 5. **音频提取**: 提取音频（内部工具）。
 6. **音频分离**（可选）: 如果启用 audio_separation_enabled，调用 audio-separator 服务分离人声和背景音。详见 ADR-008。
-7. **语音识别 + 说话人日志**: 调用 ai-adaptor 服务的 ASR 接口，识别多说话人，输出句子级时间戳和音频片段文件路径。输出格式：`[{speaker_id, start, end, text, audio_segment_path}, ...]`，其中 `audio_segment_path` 是保存在本地文件系统的音频片段文件路径（如 `./data/videos/{task_id}/segments/speaker_1_segment_0.wav`）。详见 ADR-009、ADR-011。
+7. **语音识别 + 说话人日志**: 调用 ai-adaptor 服务的 ASR 接口，识别多说话人，输出句子级时间戳。输出格式：`[{speaker_id, start_time, end_time, text}, ...]`。详见 ADR-009、ADR-011。
+7.5. **音频片段切分**: 根据 ASR 返回的时间戳，使用 ffmpeg 切分音频片段，保存到本地文件系统（如 `{LOCAL_STORAGE_PATH}/videos/{task_id}/segments/speaker_{speaker_id}_segment_{index}.wav`），生成 `audio_segment_path` 列表。
 8. **文本润色**（可选）: 调用 ai-adaptor 服务的 LLM 接口，根据用户自定义 Prompt 和视频类型进行优化。
 9. **文本翻译**: 调用 ai-adaptor 服务的 Translation 接口，将源语言文本翻译为中文。
 10. **译文优化**（可选）: 调用 ai-adaptor 服务的 LLM 接口，优化翻译，使其更符合中文表达习惯。
-11. **声音克隆**: 调用 ai-adaptor 服务的 Voice Cloning 接口，为每个说话人分别克隆声音。输入为步骤 7 输出的 `audio_segment_path`（参考音频）和翻译后的文本。详见 ADR-007。
+11. **声音克隆**: 调用 ai-adaptor 服务的 Voice Cloning 接口，为每个说话人分别克隆声音。输入为步骤 7.5 生成的 `audio_segment_path`（参考音频）和翻译后的文本。详见 ADR-007。
 12. **音频拼接**: 按时间轴顺序拼接所有说话人的音频（内部工具）。
 13. **时长对齐**: 计算时差，优先静音填充，必要时加速语速（内部工具）。详见 ADR-010。
 14. **音频合成**: 合并中文人声 + 原背景音（内部工具）。
@@ -223,8 +229,8 @@ video-translator/
 
 **注**：
 - 所有 AI 服务调用通过 ai-adaptor 统一接口实现，具体厂商由用户在应用配置中选择。详见 ADR-004。
-- 音频/视频处理（提取、拼接、对齐、合成）由 Processor 内部工具实现。详见 `Processor-design.md`。
-- `audio_segment_path` 是保存在本地文件系统的音频片段文件路径，用于声音克隆的参考音频。
+- 音频/视频处理（提取、切分、拼接、对齐、合成）由 Processor 内部工具实现。详见 `Processor-design.md`。
+- `audio_segment_path` 是由 Processor 在步骤 7.5 中生成的音频片段文件路径，用于声音克隆的参考音频。ai-adaptor 服务的 ASR 接口不返回此字段。
 
 
 ## **1.6 处理模式**
