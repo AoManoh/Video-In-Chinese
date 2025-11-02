@@ -1,12 +1,24 @@
 # AIAdaptor 服务设计文档（第二层）
 
-**文档版本**: 1.3
+**文档版本**: 1.4
 **关联宏观架构**: `notes/Base-Design.md` v2.0
-**最后更新**: 2025-11-01
+**最后更新**: 2025-11-02
 **服务定位**: Go gRPC 微服务，负责 AI 服务统一接口和适配器管理
 
 ## 版本历史
 
+- **v1.4 (2025-11-02)**:
+  - **严重问题修复**：全面修复违反 design-rules.md 规范的伪代码问题
+  - 修复第 4.2 节：移除适配器实现伪代码，改为支持的适配器清单（表格形式）
+  - 修复第 4.3 节：将适配器初始化伪代码改为关键逻辑步骤
+  - 新增第 4.4 节：适配器选择逻辑（关键逻辑步骤）
+  - 修复第 5 章：将所有服务逻辑从伪代码改为关键逻辑步骤（5.1-5.5 节）
+  - 修复第 9.2 节：将音色注册流程从伪代码改为关键逻辑步骤
+  - 修复第 9.3.2-9.3.3 节：将缓存失效处理和自动恢复流程从伪代码改为关键逻辑步骤
+  - 修复第 3.2 节：将 Go 代码结构定义改为表格形式
+  - 修复第 4.1 节：将适配器接口伪代码改为表格形式的接口规范
+  - 符合 design-rules.md 第 122-162 行的"关键逻辑步骤"规范
+  - 更新文档变更历史
 - **v1.3 (2025-11-01)**:
   - **重大更新**：全面完善第二层文档质量，符合 design-rules.md 规范
   - 补充第5章"关键逻辑步骤"：增加详细的错误处理、数据验证、配置解密等步骤
@@ -237,43 +249,41 @@ HGETALL voice_cache:speaker_1
 
 ### 3.2 内存数据结构
 
-#### 3.2.1 适配器注册表
+#### 3.2.1 适配器注册表（AdapterRegistry）
 
 **用途**: 管理所有已注册的适配器实例
 
-**数据结构**（伪代码）:
+**字段定义**:
 
-```go
-type AdapterRegistry struct {
-    asrAdapters           map[string]ASRAdapter           // key: provider name
-    translationAdapters   map[string]TranslationAdapter   // key: provider name
-    llmAdapters           map[string]LLMAdapter           // key: provider name
-    voiceCloningAdapters  map[string]VoiceCloningAdapter  // key: provider name
-}
-```
+| 字段名 | 类型 | 说明 |
+|--------|------|------|
+| asrAdapters | Map<string, ASRAdapter> | ASR 适配器映射表，key 为厂商名称（如 "aliyun", "azure"） |
+| translationAdapters | Map<string, TranslationAdapter> | 翻译适配器映射表，key 为厂商名称（如 "deepl", "google"） |
+| llmAdapters | Map<string, LLMAdapter> | LLM 适配器映射表，key 为厂商名称（如 "openai-gpt4o", "claude"） |
+| voiceCloningAdapters | Map<string, VoiceCloningAdapter> | 声音克隆适配器映射表，key 为厂商名称（如 "aliyun_cosyvoice"） |
 
 **初始化时机**: AIAdaptor 服务启动时
 
 **访问模式**: 只读（启动后不再修改）
 
-#### 3.2.2 音色缓存管理器（内存层）
+#### 3.2.2 音色缓存管理器（VoiceManager）
 
 **用途**: 在内存中缓存 Redis 中的音色信息，减少 Redis 访问
 
-**数据结构**（伪代码）:
+**字段定义**:
 
-```go
-type VoiceManager struct {
-    cache map[string]*VoiceInfo  // key: speaker_id
-    mu    sync.RWMutex            // 读写锁
-}
+| 字段名 | 类型 | 说明 |
+|--------|------|------|
+| cache | Map<string, VoiceInfo> | 音色信息缓存，key 为 speaker_id |
+| mu | 读写锁 | 并发安全保护 |
 
-type VoiceInfo struct {
-    VoiceID        string    // 阿里云返回的音色 ID
-    CreatedAt      time.Time // 创建时间
-    ReferenceAudio string    // 参考音频路径
-}
-```
+**VoiceInfo 结构**:
+
+| 字段名 | 类型 | 说明 |
+|--------|------|------|
+| VoiceID | string | 阿里云返回的音色 ID |
+| CreatedAt | timestamp | 创建时间 |
+| ReferenceAudio | string | 参考音频路径 |
 
 **缓存策略**:
 - 首次访问时从 Redis 加载
@@ -286,697 +296,437 @@ type VoiceInfo struct {
 
 ## 4. 适配器模式设计
 
-### 4.1 适配器接口定义（伪代码）
+### 4.1 适配器接口定义
+
+> ⚠️ **注意**：本节定义适配器接口的**输入输出规范**，不包含具体实现代码。具体实现见第三层文档 `AIAdaptor-design-detail.md`。
 
 #### 4.1.1 ASR 适配器接口
 
-```
-interface ASRAdapter:
-    function ASR(audio_path: string, api_key: string, endpoint: string) -> ASRResult
-```
+**接口名称**: `ASRAdapter.ASR`
 
-**参数说明**:
-- `audio_path`: 音频文件的本地路径
-- `api_key`: 解密后的 API 密钥
-- `endpoint`: 自定义端点 URL（可选，为空则使用默认端点）
+**输入参数**:
+
+| 参数名 | 类型 | 是否必填 | 说明 |
+|--------|------|----------|------|
+| audio_path | string | 是 | 音频文件的本地路径 |
+| api_key | string | 是 | 解密后的 API 密钥 |
+| endpoint | string | 否 | 自定义端点 URL（为空则使用默认端点） |
 
 **返回值**:
-- `ASRResult`: 包含 speakers 列表的结构体
 
-**错误处理**:
-- 抛出 `APIError`（包含 code 和 message）
-- `code 401`: API 密钥无效
-- `code 429`: API 配额不足
-- `code 5xx`: 外部 API 服务错误
+| 字段名 | 类型 | 说明 |
+|--------|------|------|
+| speakers | List<Speaker> | 说话人列表，包含句子级时间戳和文本 |
+
+**错误码**:
+
+| 错误码 | 说明 |
+|--------|------|
+| 401 | API 密钥无效 |
+| 429 | API 配额不足 |
+| 5xx | 外部 API 服务错误 |
 
 #### 4.1.2 翻译适配器接口
 
-```
-interface TranslationAdapter:
-    function Translate(text: string, source_lang: string, target_lang: string, video_type: string, api_key: string, endpoint: string) -> string
-```
+**接口名称**: `TranslationAdapter.Translate`
 
-**参数说明**:
-- `text`: 待翻译的文本
-- `source_lang`: 源语言代码（如 `en`）
-- `target_lang`: 目标语言代码（如 `zh`）
-- `video_type`: 视频类型（tech, casual, education, default）
-- `api_key`: 解密后的 API 密钥
-- `endpoint`: 自定义端点 URL（可选）
+**输入参数**:
+
+| 参数名 | 类型 | 是否必填 | 说明 |
+|--------|------|----------|------|
+| text | string | 是 | 待翻译的文本 |
+| source_lang | string | 是 | 源语言代码（如 `en`） |
+| target_lang | string | 是 | 目标语言代码（如 `zh`） |
+| video_type | string | 否 | 视频类型（tech, casual, education, default） |
+| api_key | string | 是 | 解密后的 API 密钥 |
+| endpoint | string | 否 | 自定义端点 URL（为空则使用默认端点） |
 
 **返回值**:
-- `string`: 翻译后的文本
 
-**错误处理**:
-- 抛出 `APIError`（包含 code 和 message）
-- `code 401`: API 密钥无效
-- `code 429`: API 配额不足
-- `code 400`: 不支持的语言对
-- `code 5xx`: 外部 API 服务错误
+| 字段名 | 类型 | 说明 |
+|--------|------|------|
+| translated_text | string | 翻译后的文本 |
+
+**错误码**:
+
+| 错误码 | 说明 |
+|--------|------|
+| 401 | API 密钥无效 |
+| 429 | API 配额不足 |
+| 400 | 不支持的语言对 |
+| 5xx | 外部 API 服务错误 |
 
 #### 4.1.3 LLM 适配器接口
 
-```
-interface LLMAdapter:
-    function Polish(text: string, video_type: string, custom_prompt: string, api_key: string, endpoint: string) -> string
-    function Optimize(text: string, api_key: string, endpoint: string) -> string
-```
+**接口名称**: `LLMAdapter.Polish` 和 `LLMAdapter.Optimize`
 
-**参数说明**:
-- `text`: 待处理的文本
-- `video_type`: 视频类型（tech, casual, education, default）
-- `custom_prompt`: 用户自定义 Prompt（可选）
-- `api_key`: 解密后的 API 密钥
-- `endpoint`: 自定义端点 URL（可选）
+**Polish 输入参数**:
+
+| 参数名 | 类型 | 是否必填 | 说明 |
+|--------|------|----------|------|
+| text | string | 是 | 待处理的文本 |
+| video_type | string | 否 | 视频类型（tech, casual, education, default） |
+| custom_prompt | string | 否 | 用户自定义 Prompt |
+| api_key | string | 是 | 解密后的 API 密钥 |
+| endpoint | string | 否 | 自定义端点 URL（为空则使用默认端点） |
+
+**Optimize 输入参数**:
+
+| 参数名 | 类型 | 是否必填 | 说明 |
+|--------|------|----------|------|
+| text | string | 是 | 待优化的文本 |
+| api_key | string | 是 | 解密后的 API 密钥 |
+| endpoint | string | 否 | 自定义端点 URL（为空则使用默认端点） |
 
 **返回值**:
-- `string`: 处理后的文本
 
-**错误处理**:
-- 抛出 `APIError`（包含 code 和 message）
-- `code 401`: API 密钥无效
-- `code 429`: API 配额不足
-- `code 400`: Prompt 格式错误
-- `code 5xx`: 外部 API 服务错误
+| 字段名 | 类型 | 说明 |
+|--------|------|------|
+| processed_text | string | 处理后的文本 |
+
+**错误码**:
+
+| 错误码 | 说明 |
+|--------|------|
+| 401 | API 密钥无效 |
+| 429 | API 配额不足 |
+| 400 | Prompt 格式错误 |
+| 5xx | 外部 API 服务错误 |
 
 #### 4.1.4 声音克隆适配器接口
 
-```
-interface VoiceCloningAdapter:
-    function CloneVoice(speaker_id: string, text: string, reference_audio: string, api_key: string, endpoint: string) -> string
-```
+**接口名称**: `VoiceCloningAdapter.CloneVoice`
 
-**参数说明**:
-- `speaker_id`: 说话人 ID（用于缓存）
-- `text`: 要合成的文本
-- `reference_audio`: 参考音频路径
-- `api_key`: 解密后的 API 密钥
-- `endpoint`: 自定义端点 URL（可选）
+**输入参数**:
+
+| 参数名 | 类型 | 是否必填 | 说明 |
+|--------|------|----------|------|
+| speaker_id | string | 是 | 说话人 ID（用于缓存） |
+| text | string | 是 | 要合成的文本 |
+| reference_audio | string | 是 | 参考音频路径 |
+| api_key | string | 是 | 解密后的 API 密钥 |
+| endpoint | string | 否 | 自定义端点 URL（为空则使用默认端点） |
 
 **返回值**:
-- `string`: 合成的音频路径
 
-**错误处理**:
-- 抛出 `APIError`（包含 code 和 message）
-- `code 401`: API 密钥无效
-- `code 429`: API 配额不足
-- `code 404`: 音色不存在
-- `code 408`: 音色注册超时
-- `code 5xx`: 外部 API 服务错误
+| 字段名 | 类型 | 说明 |
+|--------|------|------|
+| audio_path | string | 合成的音频路径 |
 
-### 4.2 适配器实现（伪代码）
+**错误码**:
 
-#### 4.2.1 阿里云 ASR 适配器
+| 错误码 | 说明 |
+|--------|------|
+| 401 | API 密钥无效 |
+| 429 | API 配额不足 |
+| 404 | 音色不存在 |
+| 408 | 音色注册超时 |
+| 5xx | 外部 API 服务错误 |
 
-```
-class AliyunASRAdapter implements ASRAdapter:
-    function ASR(audio_path, api_key, endpoint):
-        # 1. 准备请求参数
-        if endpoint is empty:
-            endpoint = "https://nls-gateway.cn-shanghai.aliyuncs.com/stream/v1/asr"
+### 4.2 支持的适配器清单
 
-        # 2. 上传音频文件到阿里云 OSS（临时存储）
-        oss_url = upload_to_aliyun_oss(audio_path, api_key)
+> ⚠️ **注意**：具体适配器实现见第三层文档 `AIAdaptor-design-detail.md`。本节仅列出支持的适配器类型。
 
-        # 3. 调用阿里云 ASR API
-        request = {
-            "app_key": extract_app_key(api_key),
-            "file_link": oss_url,
-            "enable_speaker_diarization": true  # 启用说话人分离
-        }
+#### 4.2.1 ASR 适配器
 
-        response = http_post(endpoint, request, headers={
-            "Authorization": "Bearer " + api_key
-        })
+| 厂商标识 | 厂商名称 | 说明 |
+|---------|---------|------|
+| `aliyun` | 阿里云 | 支持说话人日志（Speaker Diarization） |
+| `azure` | 微软 Azure | 支持说话人日志 |
+| `google` | Google Cloud | 支持说话人日志 |
 
-        # 4. 检查响应
-        if response.status_code == 401:
-            throw APIError(401, "invalid API key")
-        else if response.status_code == 429:
-            throw APIError(429, "API quota exceeded")
-        else if response.status_code >= 500:
-            throw APIError(response.status_code, "external API error")
+#### 4.2.2 翻译适配器
 
-        # 5. 解析结果
-        result = parse_aliyun_asr_response(response.body)
-        return result
-```
+| 厂商标识 | 厂商名称 | 说明 |
+|---------|---------|------|
+| `deepl` | DeepL | 支持 formality 参数（正式/非正式） |
+| `google` | Google Translate | 通用翻译服务 |
+| `azure` | 微软 Azure | 支持自定义术语表 |
 
-#### 4.2.2 DeepL 翻译适配器
+#### 4.2.3 LLM 适配器
 
-```
-class DeepLAdapter implements TranslationAdapter:
-    function Translate(text, source_lang, target_lang, video_type, api_key, endpoint):
-        # 1. 准备请求参数
-        if endpoint is empty:
-            endpoint = "https://api-free.deepl.com/v2/translate"
+| 厂商标识 | 厂商名称 | 说明 |
+|---------|---------|------|
+| `openai-gpt4o` | OpenAI GPT-4o | 支持自定义 Prompt |
+| `claude` | Anthropic Claude | 支持自定义 Prompt |
+| `gemini` | Google Gemini | 支持自定义 Prompt |
 
-        # 2. 根据 video_type 调整翻译参数
-        formality = get_formality_by_video_type(video_type)  # tech -> "more", casual -> "less"
+#### 4.2.4 声音克隆适配器
 
-        # 3. 调用 DeepL API
-        request = {
-            "text": [text],
-            "source_lang": source_lang.upper(),
-            "target_lang": target_lang.upper(),
-            "formality": formality
-        }
+| 厂商标识 | 厂商名称 | 说明 |
+|---------|---------|------|
+| `aliyun_cosyvoice` | 阿里云 CosyVoice | 零样本声音克隆，需要音色注册和轮询 |
 
-        response = http_post(endpoint, request, headers={
-            "Authorization": "DeepL-Auth-Key " + api_key,
-            "Content-Type": "application/json"
-        })
+### 4.3 适配器初始化流程
 
-        # 4. 检查响应
-        if response.status_code == 403:
-            throw APIError(401, "invalid API key")
-        else if response.status_code == 456:
-            throw APIError(429, "API quota exceeded")
-        else if response.status_code == 400:
-            throw APIError(400, "unsupported language pair")
-        else if response.status_code >= 500:
-            throw APIError(response.status_code, "external API error")
+**步骤 1: 创建适配器注册表**
+- 在 AIAdaptor 服务启动时创建 `AdapterRegistry` 实例
+- 初始化四个适配器映射表：asrAdapters, translationAdapters, llmAdapters, voiceCloningAdapters
 
-        # 5. 解析结果
-        result = parse_deepl_response(response.body)
-        return result.translations[0].text
-```
+**步骤 2: 注册 ASR 适配器**
+- 注册 `aliyun` → AliyunASRAdapter 实例
+- 注册 `azure` → AzureASRAdapter 实例
+- 注册 `google` → GoogleASRAdapter 实例
 
-#### 4.2.3 OpenAI LLM 适配器
+**步骤 3: 注册翻译适配器**
+- 注册 `deepl` → DeepLAdapter 实例
+- 注册 `google` → GoogleTranslateAdapter 实例
+- 注册 `azure` → AzureTranslateAdapter 实例
 
-```
-class OpenAIAdapter implements LLMAdapter:
-    function Polish(text, video_type, custom_prompt, api_key, endpoint):
-        # 1. 准备请求参数
-        if endpoint is empty:
-            endpoint = "https://api.openai.com/v1/chat/completions"
+**步骤 4: 注册 LLM 适配器**
+- 注册 `openai-gpt4o` → OpenAIAdapter 实例
+- 注册 `claude` → ClaudeAdapter 实例
+- 注册 `gemini` → GeminiAdapter 实例
 
-        # 2. 构建 Prompt
-        if custom_prompt is not empty:
-            system_prompt = custom_prompt
-        else:
-            system_prompt = get_default_polish_prompt(video_type)
+**步骤 5: 注册声音克隆适配器**
+- 注册 `aliyun_cosyvoice` → AliyunCosyVoiceAdapter 实例
+- 初始化音色缓存管理器（VoiceManager）
 
-        # 3. 调用 OpenAI API
-        request = {
-            "model": "gpt-4o",
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": text}
-            ],
-            "temperature": 0.7
-        }
+**步骤 6: 返回注册表**
+- 返回完整的 AdapterRegistry 实例
+- 后续通过 `GetAdapter(provider_type, provider_name)` 方法获取适配器
 
-        response = http_post(endpoint, request, headers={
-            "Authorization": "Bearer " + api_key,
-            "Content-Type": "application/json"
-        })
+### 4.4 适配器选择逻辑
 
-        # 4. 检查响应
-        if response.status_code == 401:
-            throw APIError(401, "invalid API key")
-        else if response.status_code == 429:
-            throw APIError(429, "API quota exceeded")
-        else if response.status_code >= 500:
-            throw APIError(response.status_code, "external API error")
+**步骤 1: 从 Redis 读取厂商配置**
+- 根据服务类型（ASR、翻译、LLM、声音克隆）读取对应的 `{service}_provider` 字段
+- 例如：ASR 服务读取 `asr_provider` 字段
 
-        # 5. 解析结果
-        result = parse_openai_response(response.body)
-        return result.choices[0].message.content
+**步骤 2: 验证厂商标识**
+- 检查厂商标识是否为空，为空则返回 `INTERNAL` 错误
+- 检查厂商标识是否在支持的适配器清单中
 
-    function Optimize(text, api_key, endpoint):
-        # 优化逻辑与 Polish 类似，使用不同的 system_prompt
-        system_prompt = "你是一个专业的译文优化助手，请优化以下翻译，使其更加流畅自然。"
-        # ... 其余逻辑与 Polish 相同
-```
+**步骤 3: 获取适配器实例**
+- 从 AdapterRegistry 中根据 `provider_type` 和 `provider_name` 获取适配器实例
+- 如果适配器不存在，返回 `INTERNAL` 错误（不支持的厂商）
 
-#### 4.2.4 阿里云 CosyVoice 适配器
-
-```
-class AliyunCosyVoiceAdapter implements VoiceCloningAdapter:
-    voice_manager: VoiceManager  # 音色缓存管理器
-
-    function CloneVoice(speaker_id, text, reference_audio, api_key, endpoint):
-        # 1. 检查缓存
-        voice_info = voice_manager.get(speaker_id)
-
-        if voice_info == null:
-            # 2. 注册新音色
-            voice_id = register_voice(speaker_id, reference_audio, api_key, endpoint)
-        else:
-            voice_id = voice_info.voice_id
-
-        # 3. 使用 voice_id 合成音频
-        try:
-            audio_path = synthesize(voice_id, text, api_key, endpoint)
-        catch APIError as e:
-            if e.code == 404:
-                # 音色失效，重新注册
-                voice_manager.delete(speaker_id)
-                voice_id = register_voice(speaker_id, reference_audio, api_key, endpoint)
-                audio_path = synthesize(voice_id, text, api_key, endpoint)
-            else:
-                throw e
-
-        return audio_path
-
-    function register_voice(speaker_id, reference_audio, api_key, endpoint):
-        # 1. 上传参考音频到公网（临时 OSS）
-        public_url = upload_to_oss(reference_audio, api_key)
-
-        # 2. 调用 CosyVoice API 创建音色
-        if endpoint is empty:
-            endpoint = "https://nls-gateway.cn-shanghai.aliyuncs.com/cosyvoice/v1/voice"
-
-        request = {
-            "audio_url": public_url,
-            "duration": get_audio_duration(reference_audio)
-        }
-
-        response = http_post(endpoint, request, headers={
-            "Authorization": "Bearer " + api_key
-        })
-
-        if response.status_code != 200:
-            throw APIError(response.status_code, "failed to create voice")
-
-        voice_id = response.body.voice_id
-
-        # 3. 轮询音色状态，直到 OK（最多等待 60 秒）
-        for i in range(60):
-            status = query_voice_status(voice_id, api_key, endpoint)
-            if status == "OK":
-                break
-            sleep(1)
-
-        if status != "OK":
-            throw APIError(408, "voice registration timeout")
-
-        # 4. 缓存 voice_id
-        voice_manager.set(speaker_id, VoiceInfo{
-            voice_id: voice_id,
-            created_at: now(),
-            reference_audio: reference_audio
-        })
-
-        return voice_id
-```
-
-**注**：具体实现见第三层文档 `AIAdaptor-design-detail.md`。
-
-### 4.3 适配器注册与初始化
-
-```
-function InitializeAdapters():
-    # 1. 创建适配器注册表
-    registry = AdapterRegistry{}
-
-    # 2. 注册 ASR 适配器
-    registry.asrAdapters["aliyun"] = new AliyunASRAdapter()
-    registry.asrAdapters["azure"] = new AzureASRAdapter()
-    registry.asrAdapters["google"] = new GoogleASRAdapter()
-
-    # 3. 注册翻译适配器
-    registry.translationAdapters["deepl"] = new DeepLAdapter()
-    registry.translationAdapters["google"] = new GoogleTranslateAdapter()
-    registry.translationAdapters["azure"] = new AzureTranslateAdapter()
-
-    # 4. 注册 LLM 适配器
-    registry.llmAdapters["openai-gpt4o"] = new OpenAIAdapter()
-    registry.llmAdapters["claude"] = new ClaudeAdapter()
-    registry.llmAdapters["gemini"] = new GeminiAdapter()
-
-    # 5. 注册声音克隆适配器
-    registry.voiceCloningAdapters["aliyun_cosyvoice"] = new AliyunCosyVoiceAdapter()
-
-    return registry
-
-function GetAdapter(registry, provider_type, provider_name):
-    # 根据类型和名称获取适配器
-    if provider_type == "asr":
-        adapter = registry.asrAdapters[provider_name]
-    else if provider_type == "translation":
-        adapter = registry.translationAdapters[provider_name]
-    else if provider_type == "llm":
-        adapter = registry.llmAdapters[provider_name]
-    else if provider_type == "voice_cloning":
-        adapter = registry.voiceCloningAdapters[provider_name]
-
-    if adapter == null:
-        throw error("unsupported provider: " + provider_name)
-
-    return adapter
-```
+**步骤 4: 调用适配器方法**
+- 调用适配器的对应方法（ASR、Translate、Polish、CloneVoice 等）
+- 传入解密后的 API 密钥和其他参数
 
 ---
 
 ## 5. 关键逻辑步骤
 
+> ⚠️ **注意**：根据 `design-rules.md` 第 122-162 行的规范，本章使用"关键逻辑步骤"而非伪代码。每个步骤是明确的业务动作，包含关键判断条件和数据流向。
+
 ### 5.1 ASR 服务逻辑
 
-```
-function ASR(request: ASRRequest):
-    # 步骤 1: 参数验证
-    if request.audio_path is empty:
-        return error(INVALID_ARGUMENT, "audio_path is required")
+**步骤 1: 参数验证**
+- 验证 `audio_path` 是否为空，为空则返回 `INVALID_ARGUMENT` 错误
+- 验证音频文件是否存在，不存在则返回 `INVALID_ARGUMENT` 错误
 
-    if not file_exists(request.audio_path):
-        return error(INVALID_ARGUMENT, "audio file not found: " + request.audio_path)
+**步骤 2: 从 Redis 读取配置**
+- 调用 `redis.HGETALL("app:settings")` 读取应用配置
+- 如果 Redis 连接失败，返回 `UNAVAILABLE` 错误
+- 如果配置为空，返回 `INTERNAL` 错误（配置未初始化）
+- 提取以下字段：
+  - `asr_provider`：ASR 服务商标识
+  - `asr_api_key`：加密的 API 密钥
+  - `asr_endpoint`：自定义端点 URL（可选）
+- 验证 `asr_provider` 和 `asr_api_key` 是否为空，为空则返回 `INTERNAL` 错误
 
-    # 步骤 2: 从 Redis 读取配置
-    try:
-        config = redis.HGETALL("app:settings")
-    catch RedisError as e:
-        return error(UNAVAILABLE, "failed to connect to Redis: " + e.message)
+**步骤 3: 解密 API 密钥**
+- 使用 AES-256-GCM 算法解密 `asr_api_key`
+- 解密密钥从环境变量 `API_KEY_ENCRYPTION_SECRET` 读取
+- 如果解密失败，返回 `UNAUTHENTICATED` 错误
 
-    if config is null or config is empty:
-        return error(INTERNAL, "app settings not found in Redis")
+**步骤 4: 选择适配器**
+- 从 AdapterRegistry 中根据 `asr_provider` 获取对应的 ASR 适配器实例
+- 如果适配器不存在（不支持的厂商），返回 `INTERNAL` 错误
 
-    provider = config["asr_provider"]
-    encrypted_api_key = config["asr_api_key"]
-    endpoint = config["asr_endpoint"]  # 可选
+**步骤 5: 调用适配器**
+- 调用适配器的 `ASR(audio_path, api_key, endpoint)` 方法
+- 错误处理：
+  - 如果返回 401/403（API 密钥无效），返回 `UNAUTHENTICATED` 错误
+  - 如果返回 429（API 配额不足），返回 `PERMISSION_DENIED` 错误
+  - 如果返回 5xx（外部 API 服务错误），返回 `INTERNAL` 错误
+  - 如果超时，返回 `DEADLINE_EXCEEDED` 错误
+  - 其他错误，返回 `INTERNAL` 错误
 
-    if provider is empty:
-        return error(INTERNAL, "asr_provider not configured")
+**步骤 6: 验证结果**
+- 检查返回结果是否为空或 speakers 列表为空
+- 如果为空，返回 `INTERNAL` 错误（ASR 返回空结果）
 
-    if encrypted_api_key is empty:
-        return error(INTERNAL, "asr_api_key not configured")
-
-    # 步骤 3: 解密 API 密钥
-    try:
-        api_key = decrypt_aes256gcm(encrypted_api_key, API_KEY_ENCRYPTION_SECRET)
-    catch DecryptionError as e:
-        return error(UNAUTHENTICATED, "failed to decrypt API key: " + e.message)
-
-    # 步骤 4: 选择适配器
-    try:
-        adapter = GetAdapter(adapter_registry, "asr", provider)
-    catch error as e:
-        return error(INTERNAL, "unsupported ASR provider: " + provider)
-
-    # 步骤 5: 调用适配器
-    try:
-        result = adapter.ASR(request.audio_path, api_key, endpoint)
-    catch APIError as e:
-        if e.code == 401 or e.code == 403:
-            return error(UNAUTHENTICATED, "invalid API key: " + e.message)
-        else if e.code == 429:
-            return error(PERMISSION_DENIED, "API quota exceeded: " + e.message)
-        else if e.code >= 500:
-            return error(INTERNAL, "external API error: " + e.message)
-        else:
-            return error(INTERNAL, "ASR failed: " + e.message)
-    catch TimeoutError as e:
-        return error(DEADLINE_EXCEEDED, "ASR request timeout: " + e.message)
-
-    # 步骤 6: 验证结果
-    if result is null or result.speakers is empty:
-        return error(INTERNAL, "ASR returned empty result")
-
-    # 步骤 7: 返回结果
-    return ASRResponse(speakers=result.speakers)
-```
+**步骤 7: 返回结果**
+- 返回 `ASRResponse`，包含 speakers 列表
 
 ### 5.2 文本润色服务逻辑
 
-```
-function Polish(request: PolishRequest):
-    # 步骤 1: 参数验证
-    if request.text is empty:
-        return error(INVALID_ARGUMENT, "text is required")
+**步骤 1: 参数验证**
+- 验证 `text` 是否为空，为空则返回 `INVALID_ARGUMENT` 错误
 
-    # 步骤 2: 从 Redis 读取配置
-    try:
-        config = redis.HGETALL("app:settings")
-    catch RedisError as e:
-        return error(UNAVAILABLE, "failed to connect to Redis: " + e.message)
+**步骤 2: 从 Redis 读取配置**
+- 调用 `redis.HGETALL("app:settings")` 读取应用配置
+- 如果 Redis 连接失败，返回 `UNAVAILABLE` 错误
 
-    # 步骤 3: 检查是否启用文本润色
-    polishing_enabled = config["polishing_enabled"]
-    if polishing_enabled != "true":
-        # 未启用，直接返回原文
-        return PolishResponse(polished_text=request.text)
+**步骤 3: 检查是否启用文本润色**
+- 读取 `polishing_enabled` 字段
+- 如果值不是 `"true"`，直接返回原文（降级策略）
+- 提取以下字段：
+  - `polishing_provider`：LLM 服务商标识
+  - `polishing_api_key`：加密的 API 密钥
+  - `polishing_endpoint`：自定义端点 URL（可选）
+  - `polishing_video_type`：默认视频类型（可选）
+  - `polishing_custom_prompt`：默认自定义 Prompt（可选）
+- 验证 `polishing_provider` 和 `polishing_api_key` 是否为空，为空则返回 `INTERNAL` 错误
 
-    provider = config["polishing_provider"]
-    encrypted_api_key = config["polishing_api_key"]
-    endpoint = config["polishing_endpoint"]  # 可选
+**步骤 4: 解密 API 密钥**
+- 使用 AES-256-GCM 算法解密 `polishing_api_key`
+- 如果解密失败，返回 `UNAUTHENTICATED` 错误
 
-    if provider is empty or encrypted_api_key is empty:
-        return error(INTERNAL, "polishing provider or API key not configured")
+**步骤 5: 选择适配器**
+- 从 AdapterRegistry 中根据 `polishing_provider` 获取对应的 LLM 适配器实例
+- 如果适配器不存在，返回 `INTERNAL` 错误
 
-    # 步骤 4: 解密 API 密钥
-    try:
-        api_key = decrypt_aes256gcm(encrypted_api_key, API_KEY_ENCRYPTION_SECRET)
-    catch DecryptionError as e:
-        return error(UNAUTHENTICATED, "failed to decrypt API key: " + e.message)
+**步骤 6: 准备参数**
+- 确定 `video_type`：优先使用请求中的值，其次使用配置中的默认值，最后使用 `"default"`
+- 确定 `custom_prompt`：优先使用请求中的值，其次使用配置中的默认值
 
-    # 步骤 5: 选择适配器
-    try:
-        adapter = GetAdapter(adapter_registry, "llm", provider)
-    catch error as e:
-        return error(INTERNAL, "unsupported LLM provider: " + provider)
+**步骤 7: 调用适配器**
+- 调用适配器的 `Polish(text, video_type, custom_prompt, api_key, endpoint)` 方法
+- 错误处理：
+  - 如果返回 401/403，返回 `UNAUTHENTICATED` 错误
+  - 如果返回 429，返回 `PERMISSION_DENIED` 错误
+  - 如果返回 400（Prompt 格式错误），返回 `INVALID_ARGUMENT` 错误
+  - 如果超时，返回 `DEADLINE_EXCEEDED` 错误
+  - 其他错误，返回 `INTERNAL` 错误
 
-    # 步骤 6: 准备参数
-    video_type = request.video_type
-    if video_type is empty:
-        video_type = config["polishing_video_type"]  # 使用配置的默认值
-    if video_type is empty:
-        video_type = "default"
+**步骤 8: 验证结果**
+- 检查返回结果是否为空
+- 如果为空，使用降级策略：返回原文，记录警告日志
 
-    custom_prompt = request.custom_prompt
-    if custom_prompt is empty:
-        custom_prompt = config["polishing_custom_prompt"]  # 使用配置的默认值
-
-    # 步骤 7: 调用适配器
-    try:
-        polished_text = adapter.Polish(request.text, video_type, custom_prompt, api_key, endpoint)
-    catch APIError as e:
-        if e.code == 401 or e.code == 403:
-            return error(UNAUTHENTICATED, "invalid API key: " + e.message)
-        else if e.code == 429:
-            return error(PERMISSION_DENIED, "API quota exceeded: " + e.message)
-        else if e.code == 400:
-            return error(INVALID_ARGUMENT, "invalid prompt: " + e.message)
-        else:
-            return error(INTERNAL, "polishing failed: " + e.message)
-    catch TimeoutError as e:
-        return error(DEADLINE_EXCEEDED, "polishing request timeout: " + e.message)
-
-    # 步骤 8: 验证结果
-    if polished_text is empty:
-        # 降级策略：返回原文
-        log_warn("polishing returned empty result, using original text")
-        polished_text = request.text
-
-    # 步骤 9: 返回结果
-    return PolishResponse(polished_text=polished_text)
-```
+**步骤 9: 返回结果**
+- 返回 `PolishResponse`，包含润色后的文本（或原文）
 
 ### 5.3 翻译服务逻辑
 
-```
-function Translate(request: TranslateRequest):
-    # 步骤 1: 参数验证
-    if request.text is empty:
-        return error(INVALID_ARGUMENT, "text is required")
+**步骤 1: 参数验证**
+- 验证 `text` 是否为空，为空则返回 `INVALID_ARGUMENT` 错误
 
-    # 步骤 2: 从 Redis 读取配置
-    try:
-        config = redis.HGETALL("app:settings")
-    catch RedisError as e:
-        return error(UNAVAILABLE, "failed to connect to Redis: " + e.message)
+**步骤 2: 从 Redis 读取配置**
+- 调用 `redis.HGETALL("app:settings")` 读取应用配置
+- 如果 Redis 连接失败，返回 `UNAVAILABLE` 错误
+- 提取以下字段：
+  - `translation_provider`：翻译服务商标识
+  - `translation_api_key`：加密的 API 密钥
+  - `translation_endpoint`：自定义端点 URL（可选）
+  - `translation_video_type`：默认视频类型（可选）
+- 验证 `translation_provider` 和 `translation_api_key` 是否为空，为空则返回 `INTERNAL` 错误
 
-    provider = config["translation_provider"]
-    encrypted_api_key = config["translation_api_key"]
-    endpoint = config["translation_endpoint"]  # 可选
+**步骤 3: 解密 API 密钥**
+- 使用 AES-256-GCM 算法解密 `translation_api_key`
+- 如果解密失败，返回 `UNAUTHENTICATED` 错误
 
-    if provider is empty or encrypted_api_key is empty:
-        return error(INTERNAL, "translation provider or API key not configured")
+**步骤 4: 选择适配器**
+- 从 AdapterRegistry 中根据 `translation_provider` 获取对应的翻译适配器实例
+- 如果适配器不存在，返回 `INTERNAL` 错误
 
-    # 步骤 3: 解密 API 密钥
-    try:
-        api_key = decrypt_aes256gcm(encrypted_api_key, API_KEY_ENCRYPTION_SECRET)
-    catch DecryptionError as e:
-        return error(UNAUTHENTICATED, "failed to decrypt API key: " + e.message)
+**步骤 5: 准备参数**
+- 确定 `source_lang`：优先使用请求中的值，默认为 `"en"`
+- 确定 `target_lang`：优先使用请求中的值，默认为 `"zh"`
+- 确定 `video_type`：优先使用请求中的值，其次使用配置中的默认值，最后使用 `"default"`
 
-    # 步骤 4: 选择适配器
-    try:
-        adapter = GetAdapter(adapter_registry, "translation", provider)
-    catch error as e:
-        return error(INTERNAL, "unsupported translation provider: " + provider)
+**步骤 6: 调用适配器**
+- 调用适配器的 `Translate(text, source_lang, target_lang, video_type, api_key, endpoint)` 方法
+- 错误处理：
+  - 如果返回 401/403，返回 `UNAUTHENTICATED` 错误
+  - 如果返回 429，返回 `PERMISSION_DENIED` 错误
+  - 如果返回 400（不支持的语言对），返回 `INVALID_ARGUMENT` 错误
+  - 如果超时，返回 `DEADLINE_EXCEEDED` 错误
+  - 其他错误，返回 `INTERNAL` 错误
 
-    # 步骤 5: 准备参数
-    source_lang = request.source_lang
-    if source_lang is empty:
-        source_lang = "en"  # 默认源语言
+**步骤 7: 验证结果**
+- 检查返回结果是否为空
+- 如果为空，返回 `INTERNAL` 错误（翻译返回空结果）
 
-    target_lang = request.target_lang
-    if target_lang is empty:
-        target_lang = "zh"  # 默认目标语言
-
-    video_type = request.video_type
-    if video_type is empty:
-        video_type = config["translation_video_type"]  # 使用配置的默认值
-    if video_type is empty:
-        video_type = "default"
-
-    # 步骤 6: 调用适配器
-    try:
-        translated_text = adapter.Translate(request.text, source_lang, target_lang, video_type, api_key, endpoint)
-    catch APIError as e:
-        if e.code == 401 or e.code == 403:
-            return error(UNAUTHENTICATED, "invalid API key: " + e.message)
-        else if e.code == 429:
-            return error(PERMISSION_DENIED, "API quota exceeded: " + e.message)
-        else if e.code == 400:
-            return error(INVALID_ARGUMENT, "unsupported language pair: " + e.message)
-        else:
-            return error(INTERNAL, "translation failed: " + e.message)
-    catch TimeoutError as e:
-        return error(DEADLINE_EXCEEDED, "translation request timeout: " + e.message)
-
-    # 步骤 7: 验证结果
-    if translated_text is empty:
-        return error(INTERNAL, "translation returned empty result")
-
-    # 步骤 8: 返回结果
-    return TranslateResponse(translated_text=translated_text)
-```
+**步骤 8: 返回结果**
+- 返回 `TranslateResponse`，包含翻译后的文本
 
 ### 5.4 译文优化服务逻辑
 
-```
-function Optimize(request: OptimizeRequest):
-    # 步骤 1: 参数验证
-    if request.text is empty:
-        return error(INVALID_ARGUMENT, "text is required")
+**步骤 1: 参数验证**
+- 验证 `text` 是否为空，为空则返回 `INVALID_ARGUMENT` 错误
 
-    # 步骤 2: 从 Redis 读取配置
-    try:
-        config = redis.HGETALL("app:settings")
-    catch RedisError as e:
-        return error(UNAVAILABLE, "failed to connect to Redis: " + e.message)
+**步骤 2: 从 Redis 读取配置**
+- 调用 `redis.HGETALL("app:settings")` 读取应用配置
+- 如果 Redis 连接失败，返回 `UNAVAILABLE` 错误
 
-    # 步骤 3: 检查是否启用译文优化
-    optimization_enabled = config["optimization_enabled"]
-    if optimization_enabled != "true":
-        # 未启用，直接返回原文
-        return OptimizeResponse(optimized_text=request.text)
+**步骤 3: 检查是否启用译文优化**
+- 读取 `optimization_enabled` 字段
+- 如果值不是 `"true"`，直接返回原文（降级策略）
+- 提取以下字段：
+  - `optimization_provider`：LLM 服务商标识
+  - `optimization_api_key`：加密的 API 密钥
+  - `optimization_endpoint`：自定义端点 URL（可选）
+- 验证 `optimization_provider` 和 `optimization_api_key` 是否为空，为空则返回 `INTERNAL` 错误
 
-    provider = config["optimization_provider"]
-    encrypted_api_key = config["optimization_api_key"]
-    endpoint = config["optimization_endpoint"]  # 可选
+**步骤 4: 解密 API 密钥**
+- 使用 AES-256-GCM 算法解密 `optimization_api_key`
+- 如果解密失败，返回 `UNAUTHENTICATED` 错误
 
-    if provider is empty or encrypted_api_key is empty:
-        return error(INTERNAL, "optimization provider or API key not configured")
+**步骤 5: 选择适配器**
+- 从 AdapterRegistry 中根据 `optimization_provider` 获取对应的 LLM 适配器实例
+- 如果适配器不存在，返回 `INTERNAL` 错误
 
-    # 步骤 4: 解密 API 密钥
-    try:
-        api_key = decrypt_aes256gcm(encrypted_api_key, API_KEY_ENCRYPTION_SECRET)
-    catch DecryptionError as e:
-        return error(UNAUTHENTICATED, "failed to decrypt API key: " + e.message)
+**步骤 6: 调用适配器**
+- 调用适配器的 `Optimize(text, api_key, endpoint)` 方法
+- 错误处理：
+  - 如果返回 401/403，返回 `UNAUTHENTICATED` 错误
+  - 如果返回 429，返回 `PERMISSION_DENIED` 错误
+  - 如果超时，返回 `DEADLINE_EXCEEDED` 错误
+  - 其他错误，返回 `INTERNAL` 错误
 
-    # 步骤 5: 选择适配器
-    try:
-        adapter = GetAdapter(adapter_registry, "llm", provider)
-    catch error as e:
-        return error(INTERNAL, "unsupported LLM provider: " + provider)
+**步骤 7: 验证结果**
+- 检查返回结果是否为空
+- 如果为空，使用降级策略：返回原文，记录警告日志
 
-    # 步骤 6: 调用适配器
-    try:
-        optimized_text = adapter.Optimize(request.text, api_key, endpoint)
-    catch APIError as e:
-        if e.code == 401 or e.code == 403:
-            return error(UNAUTHENTICATED, "invalid API key: " + e.message)
-        else if e.code == 429:
-            return error(PERMISSION_DENIED, "API quota exceeded: " + e.message)
-        else:
-            return error(INTERNAL, "optimization failed: " + e.message)
-    catch TimeoutError as e:
-        return error(DEADLINE_EXCEEDED, "optimization request timeout: " + e.message)
-
-    # 步骤 7: 验证结果
-    if optimized_text is empty:
-        # 降级策略：返回原文
-        log_warn("optimization returned empty result, using original text")
-        optimized_text = request.text
-
-    # 步骤 8: 返回结果
-    return OptimizeResponse(optimized_text=optimized_text)
-```
+**步骤 8: 返回结果**
+- 返回 `OptimizeResponse`，包含优化后的文本（或原文）
 
 ### 5.5 声音克隆服务逻辑
 
-```
-function CloneVoice(request: CloneVoiceRequest):
-    # 步骤 1: 参数验证
-    if request.speaker_id is empty:
-        return error(INVALID_ARGUMENT, "speaker_id is required")
+**步骤 1: 参数验证**
+- 验证 `speaker_id` 是否为空，为空则返回 `INVALID_ARGUMENT` 错误
+- 验证 `text` 是否为空，为空则返回 `INVALID_ARGUMENT` 错误
+- 验证 `reference_audio` 是否为空，为空则返回 `INVALID_ARGUMENT` 错误
+- 验证参考音频文件是否存在，不存在则返回 `INVALID_ARGUMENT` 错误
 
-    if request.text is empty:
-        return error(INVALID_ARGUMENT, "text is required")
+**步骤 2: 从 Redis 读取配置**
+- 调用 `redis.HGETALL("app:settings")` 读取应用配置
+- 如果 Redis 连接失败，返回 `UNAVAILABLE` 错误
+- 提取以下字段：
+  - `voice_cloning_provider`：声音克隆服务商标识
+  - `voice_cloning_api_key`：加密的 API 密钥
+  - `voice_cloning_endpoint`：自定义端点 URL（可选）
+- 验证 `voice_cloning_provider` 和 `voice_cloning_api_key` 是否为空，为空则返回 `INTERNAL` 错误
 
-    if request.reference_audio is empty:
-        return error(INVALID_ARGUMENT, "reference_audio is required")
+**步骤 3: 解密 API 密钥**
+- 使用 AES-256-GCM 算法解密 `voice_cloning_api_key`
+- 如果解密失败，返回 `UNAUTHENTICATED` 错误
 
-    if not file_exists(request.reference_audio):
-        return error(INVALID_ARGUMENT, "reference audio file not found: " + request.reference_audio)
+**步骤 4: 选择适配器**
+- 从 AdapterRegistry 中根据 `voice_cloning_provider` 获取对应的声音克隆适配器实例
+- 如果适配器不存在，返回 `INTERNAL` 错误
 
-    # 步骤 2: 从 Redis 读取配置
-    try:
-        config = redis.HGETALL("app:settings")
-    catch RedisError as e:
-        return error(UNAVAILABLE, "failed to connect to Redis: " + e.message)
+**步骤 5: 调用适配器**
+- 调用适配器的 `CloneVoice(speaker_id, text, reference_audio, api_key, endpoint)` 方法
+- **注意**：音色管理逻辑（缓存检查、音色注册、轮询）在适配器内部实现，对 AIAdaptor 服务透明
+- 错误处理：
+  - 如果返回 401/403，返回 `UNAUTHENTICATED` 错误
+  - 如果返回 429，返回 `PERMISSION_DENIED` 错误
+  - 如果返回 404（音色不存在），返回 `NOT_FOUND` 错误
+  - 如果返回 408（音色注册超时），返回 `DEADLINE_EXCEEDED` 错误
+  - 如果超时，返回 `DEADLINE_EXCEEDED` 错误
+  - 其他错误，返回 `INTERNAL` 错误
 
-    provider = config["voice_cloning_provider"]
-    encrypted_api_key = config["voice_cloning_api_key"]
-    endpoint = config["voice_cloning_endpoint"]  # 可选
+**步骤 6: 验证结果**
+- 检查返回的音频路径是否为空
+- 检查音频文件是否存在
+- 如果验证失败，返回 `INTERNAL` 错误（声音克隆返回无效音频路径）
 
-    if provider is empty or encrypted_api_key is empty:
-        return error(INTERNAL, "voice cloning provider or API key not configured")
-
-    # 步骤 3: 解密 API 密钥
-    try:
-        api_key = decrypt_aes256gcm(encrypted_api_key, API_KEY_ENCRYPTION_SECRET)
-    catch DecryptionError as e:
-        return error(UNAUTHENTICATED, "failed to decrypt API key: " + e.message)
-
-    # 步骤 4: 选择适配器
-    try:
-        adapter = GetAdapter(adapter_registry, "voice_cloning", provider)
-    catch error as e:
-        return error(INTERNAL, "unsupported voice cloning provider: " + provider)
-
-    # 步骤 5: 调用适配器（音色管理逻辑在适配器内部）
-    try:
-        audio_path = adapter.CloneVoice(
-            speaker_id=request.speaker_id,
-            text=request.text,
-            reference_audio=request.reference_audio,
-            api_key=api_key,
-            endpoint=endpoint
-        )
-    catch APIError as e:
-        if e.code == 401 or e.code == 403:
-            return error(UNAUTHENTICATED, "invalid API key: " + e.message)
-        else if e.code == 429:
-            return error(PERMISSION_DENIED, "API quota exceeded: " + e.message)
-        else if e.code == 404:
-            return error(NOT_FOUND, "voice not found: " + e.message)
-        else if e.code == 408:
-            return error(DEADLINE_EXCEEDED, "voice registration timeout: " + e.message)
-        else:
-            return error(INTERNAL, "voice cloning failed: " + e.message)
-    catch TimeoutError as e:
-        return error(DEADLINE_EXCEEDED, "voice cloning request timeout: " + e.message)
-
-    # 步骤 6: 验证结果
-    if audio_path is empty or not file_exists(audio_path):
-        return error(INTERNAL, "voice cloning returned invalid audio path")
-
-    # 步骤 7: 返回结果
-    return CloneVoiceResponse(audio_path=audio_path)
-```
+**步骤 7: 返回结果**
+- 返回 `CloneVoiceResponse`，包含合成的音频路径
 
 ---
 
@@ -1319,81 +1069,55 @@ struct VoiceInfo:
     reference_audio: string    // 参考音频路径
 ```
 
-### 9.2 音色注册流程（伪代码）
+### 9.2 音色注册流程
 
-```
-function RegisterVoice(speaker_id, reference_audio, api_key, endpoint):
-    retry_count = 0
-    max_retries = VOICE_REGISTER_RETRY  # 从环境变量读取，默认 3
+> ⚠️ **注意**：本节描述音色注册的关键逻辑步骤，具体实现见第三层文档 `AIAdaptor-design-detail.md`。
 
-    while retry_count <= max_retries:
-        try:
-            # 1. 上传参考音频到临时 OSS
-            public_url = upload_to_temp_oss(reference_audio, api_key)
+**步骤 1: 初始化重试参数**
+- 设置 `retry_count = 0`
+- 从环境变量读取 `VOICE_REGISTER_RETRY`（默认 3）作为最大重试次数
 
-            # 2. 调用阿里云 API 创建音色
-            if endpoint is empty:
-                endpoint = "https://nls-gateway.cn-shanghai.aliyuncs.com/cosyvoice/v1/voice"
+**步骤 2: 上传参考音频到临时 OSS**
+- 将参考音频文件上传到阿里云 OSS（临时存储，用于音色注册）
+- 获取公网可访问的 URL（`public_url`）
 
-            request = {
-                "audio_url": public_url,
-                "duration": get_audio_duration(reference_audio)
-            }
+**步骤 3: 调用阿里云 API 创建音色**
+- 如果 `endpoint` 为空，使用默认端点：`https://nls-gateway.cn-shanghai.aliyuncs.com/cosyvoice/v1/voice`
+- 构建请求参数：
+  - `audio_url`: 参考音频的公网 URL
+  - `duration`: 参考音频的时长（秒）
+- 发送 HTTP POST 请求，携带 `Authorization: Bearer {api_key}` 头
+- 如果响应状态码不是 200，抛出 `APIError`
+- 从响应中提取 `voice_id`
 
-            response = http_post(endpoint, request, headers={
-                "Authorization": "Bearer " + api_key
-            })
+**步骤 4: 轮询音色状态**
+- 从环境变量读取 `VOICE_REGISTER_TIMEOUT`（默认 60 秒）作为超时时间
+- 循环轮询音色状态（每秒查询一次）：
+  - 发送 HTTP GET 请求到 `{endpoint}/{voice_id}`
+  - 检查响应中的 `status` 字段：
+    - 如果 `status == "OK"`，跳出循环
+    - 如果 `status == "FAILED"`，抛出 `APIError(500, "voice registration failed")`
+  - 如果超过超时时间仍未成功，抛出 `APIError(408, "voice registration timeout")`
 
-            if response.status_code != 200:
-                throw APIError(response.status_code, "failed to create voice")
+**步骤 5: 缓存音色信息到 Redis**
+- 调用 `redis.HSET("voice_cache:{speaker_id}")` 存储以下字段：
+  - `voice_id`: 阿里云返回的音色 ID
+  - `created_at`: 创建时间（ISO 8601 格式）
+  - `reference_audio`: 参考音频路径
 
-            voice_id = response.body.voice_id
+**步骤 6: 缓存音色信息到内存**
+- 将 `VoiceInfo` 对象存储到 `voice_manager` 的内存缓存中
+- 包含字段：voice_id, created_at, reference_audio
 
-            # 3. 轮询音色状态（最多等待 VOICE_REGISTER_TIMEOUT 秒）
-            timeout = VOICE_REGISTER_TIMEOUT  # 从环境变量读取，默认 60
-            for i in range(timeout):
-                status_response = http_get(endpoint + "/" + voice_id, headers={
-                    "Authorization": "Bearer " + api_key
-                })
+**步骤 7: 记录成功日志**
+- 记录 INFO 级别日志：`voice registered successfully: speaker_id={speaker_id}, voice_id={voice_id}`
+- 返回 `voice_id`
 
-                if status_response.status_code == 200:
-                    status = status_response.body.status
-                    if status == "OK":
-                        break
-                    else if status == "FAILED":
-                        throw APIError(500, "voice registration failed")
-
-                sleep(1)
-
-            if status != "OK":
-                throw APIError(408, "voice registration timeout")
-
-            # 4. 缓存音色信息到 Redis
-            redis.HSET("voice_cache:" + speaker_id, {
-                "voice_id": voice_id,
-                "created_at": now().to_iso8601(),
-                "reference_audio": reference_audio
-            })
-
-            # 5. 缓存音色信息到内存
-            voice_manager.set(speaker_id, VoiceInfo{
-                voice_id: voice_id,
-                created_at: now(),
-                reference_audio: reference_audio
-            })
-
-            log_info("voice registered successfully: speaker_id=" + speaker_id + ", voice_id=" + voice_id)
-            return voice_id
-
-        catch APIError as e:
-            retry_count++
-            if retry_count > max_retries:
-                log_error("voice registration failed after " + max_retries + " retries: " + e.message)
-                throw e
-
-            log_warn("voice registration failed, retrying (" + retry_count + "/" + max_retries + "): " + e.message)
-            sleep(VOICE_REGISTER_RETRY_INTERVAL)  # 从环境变量读取，默认 5 秒
-```
+**步骤 8: 错误处理和重试**
+- 如果步骤 2-6 中任何步骤抛出 `APIError`：
+  - 增加 `retry_count`
+  - 如果 `retry_count > max_retries`，记录 ERROR 日志并抛出异常
+  - 否则，记录 WARN 日志，等待 `VOICE_REGISTER_RETRY_INTERVAL` 秒（默认 5 秒），然后重试
 
 ### 9.3 音色缓存失效处理
 
@@ -1406,70 +1130,51 @@ function RegisterVoice(speaker_id, reference_audio, api_key, endpoint):
 | **场景 3**: 阿里云音色 ID 失效 | 调用 `synthesize(voice_id, text)` 返回 404 | 清除缓存，重新注册音色 | 自动恢复，对调用方透明 |
 | **场景 4**: 音色注册失败 | `RegisterVoice` 抛出异常 | 重试 3 次，失败后返回错误给 Processor | 需要人工介入 |
 
-#### 9.3.2 缓存失效处理流程（伪代码）
+#### 9.3.2 缓存失效处理流程
 
-```
-function GetOrRegisterVoice(speaker_id, reference_audio, api_key, endpoint):
-    # 1. 检查内存缓存
-    voice_info = voice_manager.get(speaker_id)
+**步骤 1: 检查内存缓存**
+- 调用 `voice_manager.get(speaker_id)` 查询内存缓存
+- 如果命中（返回非空 `VoiceInfo`）：
+  - 记录 DEBUG 日志：`voice found in memory cache: speaker_id={speaker_id}`
+  - 返回 `voice_info.voice_id`
 
-    if voice_info != null:
-        log_debug("voice found in memory cache: speaker_id=" + speaker_id)
-        return voice_info.voice_id
+**步骤 2: 检查 Redis 缓存**
+- 调用 `redis.HGETALL("voice_cache:{speaker_id}")` 查询 Redis 缓存
+- 如果命中（返回非空数据且包含 `voice_id` 字段）：
+  - 从 Redis 数据构建 `VoiceInfo` 对象：
+    - `voice_id`: Redis 中的 `voice_id` 字段
+    - `created_at`: 解析 Redis 中的 `created_at` 字段（ISO 8601 格式）
+    - `reference_audio`: Redis 中的 `reference_audio` 字段
+  - 将 `VoiceInfo` 对象存储到内存缓存（`voice_manager.set(speaker_id, voice_info)`）
+  - 记录 INFO 日志：`voice loaded from Redis cache: speaker_id={speaker_id}`
+  - 返回 `voice_info.voice_id`
 
-    # 2. 检查 Redis 缓存
-    redis_data = redis.HGETALL("voice_cache:" + speaker_id)
+**步骤 3: 缓存未命中，注册新音色**
+- 记录 INFO 日志：`voice not found in cache, registering new voice: speaker_id={speaker_id}`
+- 调用 `RegisterVoice(speaker_id, reference_audio, api_key, endpoint)` 注册新音色
+- 返回新注册的 `voice_id`
 
-    if redis_data is not null and redis_data["voice_id"] is not empty:
-        # 从 Redis 恢复到内存
-        voice_info = VoiceInfo{
-            voice_id: redis_data["voice_id"],
-            created_at: parse_iso8601(redis_data["created_at"]),
-            reference_audio: redis_data["reference_audio"]
-        }
-        voice_manager.set(speaker_id, voice_info)
-        log_info("voice loaded from Redis cache: speaker_id=" + speaker_id)
-        return voice_info.voice_id
+#### 9.3.3 音色失效自动恢复流程
 
-    # 3. 缓存未命中，注册新音色
-    log_info("voice not found in cache, registering new voice: speaker_id=" + speaker_id)
-    voice_id = RegisterVoice(speaker_id, reference_audio, api_key, endpoint)
-    return voice_id
-```
+**步骤 1: 获取或注册音色**
+- 调用 `GetOrRegisterVoice(speaker_id, reference_audio, api_key, endpoint)` 获取 `voice_id`
 
-#### 9.3.3 音色失效自动恢复流程（伪代码）
+**步骤 2: 尝试合成音频**
+- 调用 `synthesize(voice_id, text, api_key, endpoint)` 合成音频
+- 如果成功，返回音频路径
 
-```
-function SynthesizeWithAutoRecovery(speaker_id, text, reference_audio, api_key, endpoint):
-    # 1. 获取或注册音色
-    voice_id = GetOrRegisterVoice(speaker_id, reference_audio, api_key, endpoint)
+**步骤 3: 处理音色失效错误（404）**
+- 如果 `synthesize` 抛出 `APIError` 且错误码为 404：
+  - 记录 WARN 日志：`voice not found (404), clearing cache and re-registering: speaker_id={speaker_id}`
+  - 清除内存缓存：`voice_manager.delete(speaker_id)`
+  - 清除 Redis 缓存：`redis.DEL("voice_cache:{speaker_id}")`
+  - 重新注册音色：`new_voice_id = RegisterVoice(speaker_id, reference_audio, api_key, endpoint)`
+  - 重新合成音频：`audio_path = synthesize(new_voice_id, text, api_key, endpoint)`
+  - 记录 INFO 日志：`voice re-registered and synthesis succeeded: speaker_id={speaker_id}`
+  - 返回音频路径
 
-    # 2. 尝试合成音频
-    try:
-        audio_path = synthesize(voice_id, text, api_key, endpoint)
-        return audio_path
-    catch APIError as e:
-        if e.code == 404:
-            # 音色失效，清除缓存并重新注册
-            log_warn("voice not found (404), clearing cache and re-registering: speaker_id=" + speaker_id)
-
-            # 清除内存缓存
-            voice_manager.delete(speaker_id)
-
-            # 清除 Redis 缓存
-            redis.DEL("voice_cache:" + speaker_id)
-
-            # 重新注册音色
-            new_voice_id = RegisterVoice(speaker_id, reference_audio, api_key, endpoint)
-
-            # 重新合成音频
-            audio_path = synthesize(new_voice_id, text, api_key, endpoint)
-            log_info("voice re-registered and synthesis succeeded: speaker_id=" + speaker_id)
-            return audio_path
-        else:
-            # 其他错误，直接抛出
-            throw e
-```
+**步骤 4: 处理其他错误**
+- 如果 `synthesize` 抛出其他错误（非 404），直接抛出异常
 
 ### 9.4 音色缓存清理策略
 
@@ -1565,6 +1270,7 @@ function SynthesizeWithAutoRecovery(speaker_id, text, reference_audio, api_key, 
 
 | 版本 | 日期       | 变更内容                                                                                     |
 | ---- | ---------- | -------------------------------------------------------------------------------------------- |
+| 1.4  | 2025-11-02 | **严重问题修复**：全面修复违反 design-rules.md 规范的伪代码问题，符合第 122-162 行的"关键逻辑步骤"规范。<br>1. **修复第 4.2 节**：移除适配器实现伪代码（AliyunASRAdapter、DeepLAdapter、OpenAIAdapter、AliyunCosyVoiceAdapter），改为支持的适配器清单（表格形式，4.2.1-4.2.4 节）。<br>2. **修复第 4.3 节**：将适配器初始化伪代码（`function InitializeAdapters()`）改为关键逻辑步骤（步骤 1-6）。<br>3. **新增第 4.4 节**：适配器选择逻辑（关键逻辑步骤，步骤 1-4）。<br>4. **修复第 5 章**：将所有服务逻辑从伪代码改为关键逻辑步骤：<br>&nbsp;&nbsp;&nbsp;&nbsp;- 5.1 节 ASR 服务逻辑（步骤 1-7）<br>&nbsp;&nbsp;&nbsp;&nbsp;- 5.2 节文本润色服务逻辑（步骤 1-9）<br>&nbsp;&nbsp;&nbsp;&nbsp;- 5.3 节翻译服务逻辑（步骤 1-8）<br>&nbsp;&nbsp;&nbsp;&nbsp;- 5.4 节译文优化服务逻辑（步骤 1-8）<br>&nbsp;&nbsp;&nbsp;&nbsp;- 5.5 节声音克隆服务逻辑（步骤 1-7）<br>5. **修复第 9.2 节**：将音色注册流程从伪代码（`function RegisterVoice()`）改为关键逻辑步骤（步骤 1-8）。<br>6. **修复第 9.3.2-9.3.3 节**：将缓存失效处理和自动恢复流程从伪代码改为关键逻辑步骤。<br>7. **修复第 3.2 节**：将 Go 代码结构定义（`type AdapterRegistry struct`）改为表格形式。<br>8. **修复第 4.1 节**：将适配器接口伪代码（`interface ASRAdapter`）改为表格形式的接口规范（输入参数、返回值、错误码）。<br>9. **明确模糊点**：在第 5 章和第 9 章开头添加注释，明确说明使用"关键逻辑步骤"而非伪代码，避免信息模糊导致误差幻觉。 |
 | 1.3  | 2025-11-01 | **重大更新**：全面完善第二层文档质量，符合 design-rules.md 规范。<br>1. **补充第5章"关键逻辑步骤"**：增加详细的错误处理、数据验证、配置解密等步骤（5.1-5.5 节）。<br>2. **补充第4章"适配器模式设计"**：增加 ASR、翻译、LLM 适配器实现示例（4.2.1-4.2.3 节），增加适配器注册与初始化逻辑（4.3 节），完善接口定义的参数说明、返回值说明、错误处理说明（4.1.1-4.1.4 节）。<br>3. **补充第9章"音色管理策略"**：增加缓存失效处理（9.3 节）、缓存清理策略（9.4 节）、最佳实践（9.5 节），完善音色注册流程的重试策略和错误处理（9.2 节）。<br>4. **完善第7章"错误码清单"**：增加业务特定错误码（7.2 节）、错误处理策略（7.3 节），包括重试策略、降级策略、错误日志级别。<br>5. **完善第8章"配置项定义"**：增加类型、默认值、是否必填说明（8.1 节），新增音色管理和 API 调用相关配置项。<br>6. **完善第6章"服务交互时序图"**：增加错误处理分支（6.2 节），新增 ASR 和翻译服务时序图（6.3-6.4 节）。 |
 | 1.2  | 2025-10-31 | 1. **补充第3章"核心数据结构"**，符合 design-rules.md 第二层文档模板要求。 2. 新增 Redis 数据结构定义（app:settings、voice_cache）。 3. 新增内存数据结构定义（适配器注册表、音色缓存管理器）。 4. 调整后续章节编号（原第3章→第4章，以此类推）。 |
 | 1.1  | 2025-10-30 | 1. 更新关联宏观架构版本为 v2.0。 2. 新增版本历史章节。 3. 更新"与第一层文档的对应关系"章节。 4. 新增"文档变更历史"章节。 |
