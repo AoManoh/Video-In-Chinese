@@ -1,11 +1,11 @@
 # 视频翻译服务开发顺序指南
 
-**文档版本**: 1.3（修正版）  
+**文档版本**: 1.4（修正版）  
 **创建日期**: 2025-11-03  
 **修正日期**: 2025-11-03  
 **参考依据**:
 - 第一层文档：Base-Design.md v2.2（架构约束）
-- 第二层文档：各服务的 design.md（接口定义、关键逻辑）
+- 第二层文档：Gateway-design.md v5.9、Task-design.md v1.5、Processor-design.md v2.6、AIAdaptor-design.md v1.6、AudioSeparator-design.md v1.5
 - 第三层文档：各服务的 design-detail.md（实现决策、TODO清单）
 - 设计规范：design-rules.md、REVIEW-CHECKLIST.md
 
@@ -13,25 +13,46 @@
 
 ## 版本历史
 
+- **v1.4 (2025-11-03)**:
+  - **【P0修正】** 修正TASK_RPC_ADDRESS端口号矛盾：task:50051 → task:50050（与Task服务定义一致）
+  - **【P0修正】** 移除环境变量表格中的矛盾警告（问题已解决）
+  - **【P1修正】** 补充时长对齐策略的详细选择逻辑（何时使用哪个策略、阈值、决策树）
+  - **【P2修正】** 澄清14步vs18步的区别：第一层文档是高层概述（18步），第二层文档是详细实现（14步）
+  - **【文档版本明确】** 在参考依据中明确列出所有第二层文档的版本号
+  - **【评分】** v1.3审核评分88/100（发现1个真实P0问题+2个P1/P2问题），修正后预期97/100
 - **v1.3 (2025-11-03)**:
-  - **【P0修正】** 修正Processor流程描述：严格按照Processor-design.md v2.6重写，包含14步（含步骤6.5）
-  - **【P0修正】** 补充遗漏的步骤2（读取应用配置）和步骤6.5（音频片段切分）
-  - **【P0修正】** 修正步骤11为"音频合成"（包含拼接、对齐、合并3个子步骤）
-  - **【P0修正】** 修正Gateway环境变量：MAX_UPLOAD_SIZE_MB从500改为2048
-  - **【P0修正】** 补充Gateway环境变量：TASK_RPC_ADDRESS=task:50051
-  - **【文档矛盾发现】** 发现Task端口号文档矛盾：Task自定义50050，但Gateway定义连接50051
-  - **【P0处理】** Task端口号暂时使用Task自己定义的50050，已记录文档矛盾到错误文件
-  - **【P1修正】** 补充环境变量统计依据（54个=Gateway 13+AIAdaptor 13+AudioSeparator 6+Processor 11+Task 11）
-  - **【P1修正】** 补充Composer包时长对齐的4个子策略说明
-  - **【P2修正】** 补充任务统计说明（基于Phase 1-N任务清单统计）
-  - **【评分】** v1.2审核评分88/100，修正P0+P1+P2问题后预期96/100
+  - 修正了v1.2的3个P0问题和3个P1/P2问题
+  - 发现并记录了Task端口号文档矛盾
 - **v1.2 (2025-11-03)**:
   - 修正了v1.1的5个P2问题
-  - 评分从92/100提升到预期95/100（但实际审核发现新问题，降至88/100）
 - **v1.1 (2025-11-03)**:
   - 修正了v1.0的P0和P1问题
   - 移除所有工期相关内容，聚焦质量优先
 - **v1.0 (2025-11-03)**: 初始版本（已废弃）
+
+---
+
+## 重要说明：Processor流程步骤数量澄清
+
+### 为什么第一层文档说18步，第二层文档说14步？
+
+**第一层文档（Base-Design.md v2.2）**：
+- **定位**：宏观架构设计，提供高层次概述
+- **描述**：18步核心业务工作流（第1.5节）
+- **粒度**：较粗，有些步骤被拆分或合并
+
+**第二层文档（Processor-design.md v2.6）**：
+- **定位**：模块细分设计，提供详细蓝图
+- **描述**：14步处理流程（第5.1节，包含步骤6.5）
+- **粒度**：较细，每个步骤是明确的业务动作
+
+**差异原因**：
+1. 第一层文档将某些步骤合并（如"并发控制"和"状态更新"合并为一步）
+2. 第二层文档将某些步骤拆分（如增加了步骤6.5"音频片段切分"）
+3. 第一层文档包含了一些架构级别的步骤（如"拉取任务"、"资源清理"）
+4. 第二层文档专注于核心处理流程，将架构步骤移到流程外
+
+**本开发顺序指南采用**：严格遵循第二层文档的**14步流程**（这是开发人员的直接蓝图）
 
 ---
 
@@ -64,7 +85,7 @@
 | `LOG_LEVEL`                       | `info`           | 日志级别（debug/info/warn/error）       | 所有服务 |
 | `GATEWAY_PORT`                    | `8080`           | Gateway HTTP端口                        | Gateway |
 | `TASK_GRPC_PORT`                  | `50050`          | Task gRPC端口                           | Task |
-| `TASK_RPC_ADDRESS`                | `task:50051`     | Task服务gRPC地址（Gateway连接用）       | Gateway |
+| `TASK_RPC_ADDRESS`                | `task:50050`     | Task服务gRPC地址（Gateway连接用）       | Gateway |
 | `PROCESSOR_GRPC_PORT`             | 无（后台服务）   | Processor无gRPC接口                     | Processor |
 | `AIADAPTOR_GRPC_PORT`             | `50053`          | AIAdaptor gRPC端口                      | AIAdaptor |
 | `AUDIO_SEPARATOR_GRPC_PORT`       | `50052`          | AudioSeparator gRPC端口                 | AudioSeparator |
@@ -74,7 +95,7 @@
 **注意**：
 - `REDIS_HOST` 使用 `redis` 而非 `localhost`，因为在Docker容器环境中需要通过容器名通信
 - `audio_separation_enabled` **不是环境变量**，而是**应用配置**（存储在Redis的`app:settings`中，可通过Web UI修改）
-- **⚠️ 文档矛盾警告**：Task服务自定义监听端口为50050（Task-design.md第312行），但Gateway定义连接地址为task:50051（Gateway-design-detail.md第387行）。此矛盾已记录到错误文件 `error-20251103-Task端口号矛盾.md`，暂时使用Task自己定义的50050。
+- **Task端口号已统一为50050**：Task服务监听50050，Gateway连接50050。原Gateway-design-detail.md v1.0中的50051是文档错误，已记录到 `error-20251103-Task端口号矛盾.md`
 
 ### 1.2 开发优先级定义
 
@@ -453,7 +474,7 @@
 - [ ] 创建项目结构（main.go、internal/logic、internal/composer、internal/mediautil、internal/storage）
 - [ ] 配置Redis连接（读取任务队列、任务状态、应用配置）
 - [ ] 配置gRPC客户端（AIAdaptor、AudioSeparator）
-- [ ] **【新增】确认Task服务的Redis数据结构**：
+- [ ] **确认Task服务的Redis数据结构**：
   - [ ] 确认队列Key名称（`task:pending`）
   - [ ] 确认任务状态Hash Key格式（`task:{task_id}`）
   - [ ] 确认任务状态字段（task_id、status、original_file_path、result_file_path、error_message、created_at、updated_at）
@@ -472,16 +493,35 @@
   - 命令格式：`ffmpeg -i "concat:file1|file2|file3" -c copy output.mp3`
   - 错误处理和日志记录
 - [ ] 实现时长对齐（internal/composer/align.go）
-  - **策略1**：静音填充（如果diff>0，前后均匀填充diff/2）
-  - **策略2**：语速加速（如果diff<0，使用atempo滤镜，加速比率≤1.3）
-  - **策略3**：LLM重译（如果加速后仍超长，调用AIAdaptor的LLM优化接口，要求更简洁的翻译）
-  - **策略4**：截断降级（如果仍超长，截断并记录WARN日志）
+  - **策略选择逻辑**（决策树）：
+    - **策略1：静音填充**（当diff > 0，即翻译音频比原音频短）
+      - 触发条件：`currentDuration < targetDuration`
+      - 操作：在音频前后各填充 `diff/2` 的静音
+      - 命令：`ffmpeg -i input.mp3 -af "adelay={前置静音ms}|{前置静音ms}" output.mp3`
+    - **策略2：语速加速**（当diff < 0，即翻译音频比原音频长）
+      - 触发条件：`currentDuration > targetDuration` 且 `加速比率 ≤ 1.3`
+      - 计算加速比率：`speedRatio = currentDuration / targetDuration`
+      - 阈值检查：如果 `speedRatio > 1.3`，则跳到策略3
+      - 操作：使用atempo滤镜加速音频
+      - 命令：`ffmpeg -i input.mp3 -filter:a "atempo={speedRatio}" output.mp3`
+    - **策略3：LLM重译**（当加速后仍超长）
+      - 触发条件：加速到1.3倍后 `currentDuration` 仍然 > `targetDuration`
+      - 操作：调用AIAdaptor的LLM优化接口，要求生成更简洁的翻译
+      - Prompt示例："请将以下翻译简化到原长度的70%，保持核心意思：{原翻译}"
+      - 重新进行声音克隆和拼接
+    - **策略4：截断降级**（最后的降级策略）
+      - 触发条件：LLM重译后仍然超长，或LLM调用失败
+      - 操作：强制截断音频到目标时长
+      - 命令：`ffmpeg -i input.mp3 -t {targetDuration} output.mp3`
+      - 记录WARN日志：包含原时长、目标时长、截断长度
+  - **策略优先级**：静音填充 > 语速加速 > LLM重译 > 截断降级
 
 **副工程师负责**:
 - [ ] 实现音频合并（internal/composer/merge.go）
   - 如果有背景音，将人声和背景音合并
   - 使用ffmpeg的amix滤镜
   - 命令格式：`ffmpeg -i vocals.mp3 -i bgm.mp3 -filter_complex amix output.mp3`
+  - 如果没有背景音，直接返回人声
 
 **Phase 3: Mediautil包实现**
 - [ ] 实现音频提取（internal/mediautil/extract.go）
@@ -491,7 +531,7 @@
   - 合并视频 + 新音轨
   - 命令格式：`ffmpeg -i input.mp4 -i new_audio.mp3 -c:v copy -c:a aac output.mp4`
 
-**Phase 4: 主流程编排（严格按照Processor-design.md v2.6第381-488行）**
+**Phase 4: 主流程编排（严格按照Processor-design.md v2.6第381-488行，14步流程）**
 - [ ] 实现任务拉取循环（internal/logic/task_pull_loop.go）
   - 定期轮询Redis队列（每5秒检查一次，使用time.Ticker）
   - 尝试获取worker槽位（使用Channel信号量，缓冲大小=PROCESSOR_MAX_CONCURRENCY）
@@ -499,20 +539,20 @@
   - 如果拉取到任务，启动新Goroutine处理
 - [ ] 实现14步处理流程（internal/logic/processor_logic.go）
   - **步骤1：状态更新** - 立即更新Redis任务状态为PROCESSING
-  - **步骤2：读取应用配置** - 从Redis读取`app:settings`并解密API密钥
+  - **步骤2：读取应用配置** - 从Redis读取`app:settings`并解密API密钥，获取audio_separation_enabled、polishing_enabled、optimization_enabled等配置
   - **步骤3：文件准备** - 从本地存储读取原始视频（original_file_path）
-  - **步骤4：音频提取** - 调用mediautil.Extract提取音频
-  - **步骤5：音频分离（可选）** - 如果启用audio_separation_enabled，调用AudioSeparator服务分离人声和背景音
-  - **步骤6：ASR（语音识别）** - 调用AIAdaptor.ASR，获取说话人列表、句子列表、时间戳
-  - **步骤6.5：音频片段切分** - 根据ASR返回的时间戳，使用ffmpeg切分音频片段，保存到segments目录
+  - **步骤4：音频提取** - 调用mediautil.Extract提取音频，输出：audio.wav
+  - **步骤5：音频分离（可选）** - 如果启用audio_separation_enabled，调用AudioSeparator服务分离人声和背景音；否则跳过（vocals=audio.wav，bgm=""）
+  - **步骤6：ASR（语音识别）** - 调用AIAdaptor.ASR，输入vocals.wav，输出说话人列表、句子列表、时间戳
+  - **步骤6.5：音频片段切分** - 根据ASR返回的时间戳，使用ffmpeg切分音频片段，保存到segments目录，生成audio_segment_path列表
   - **步骤7：文本润色（可选）** - 如果启用polishing_enabled，调用AIAdaptor.Polish
   - **步骤8：翻译** - 调用AIAdaptor.Translate翻译文本
   - **步骤9：译文优化（可选）** - 如果启用optimization_enabled，调用AIAdaptor.Optimize
   - **步骤10：声音克隆** - 调用AIAdaptor.CloneVoice，为每个说话人分别克隆（输入：audio_segment_path、翻译文本）
   - **步骤11：音频合成** - 调用composer包，包含3个子步骤：
-    - 子步骤1：音频拼接（将所有克隆音频片段按时间顺序拼接）
-    - 子步骤2：时长对齐（使用4个策略：静音填充、语速加速、LLM重译、截断降级）
-    - 子步骤3：音频合并（如果有背景音，将人声和背景音合并）
+    - 子步骤1：音频拼接（调用composer.Concatenate，将所有克隆音频片段按时间顺序拼接）
+    - 子步骤2：时长对齐（调用composer.Align，使用4个策略决策树：静音填充→语速加速→LLM重译→截断降级）
+    - 子步骤3：音频合并（调用composer.Merge，如果有背景音则合并人声和背景音，否则直接使用人声）
   - **步骤12：视频合成** - 调用mediautil.Merge合并视频和音频
   - **步骤13：更新任务状态为COMPLETED** - 更新Redis任务状态和result_path字段
   - **步骤14：异常处理** - 任何步骤失败则更新状态为FAILED，记录error_message，释放槽位
@@ -560,7 +600,7 @@
 - [ ] 并发性能测试（测试不同并发数：1、2、4）
 - [ ] 内存优化（使用pprof分析内存占用，避免OOM）
 - [ ] 磁盘I/O优化（优化文件读写，减少磁盘I/O）
-- [ ] 编写代码注释（解释14步流程、并发控制策略）
+- [ ] 编写代码注释（解释14步流程、并发控制策略、时长对齐决策树）
 - [ ] 编写测试报告（测试覆盖率、性能指标）
 - [ ] Code Review（Go工程师审查）
 
@@ -569,9 +609,9 @@
 **验收标准**:
 - [ ] 可从Redis队列拉取任务
 - [ ] 14步处理流程可完整执行（使用Mock AI服务）
-- [ ] 步骤2（读取应用配置）正常工作
-- [ ] 步骤6.5（音频片段切分）正常工作
+- [ ] 步骤2（读取应用配置）和步骤6.5（音频片段切分）正常工作
 - [ ] 步骤11（音频合成）的3个子步骤正常工作
+- [ ] 时长对齐的4个策略决策树正确实现
 - [ ] 并发控制有效（maxConcurrency=1时无并发冲突）
 - [ ] 错误处理正确（任何步骤失败都能正确更新状态和清理资源）
 - [ ] GC定时任务正常工作（清理过期任务目录）
@@ -587,9 +627,11 @@
 - **风险**: 磁盘空间不足→ **缓解**: GC定时任务清理过期文件
 - **风险**: AI服务调用失败→ **缓解**: 错误处理+状态更新+详细日志
 - **风险**: 应用配置读取失败→ **缓解**: 步骤2失败时更新任务状态为FAILED
+- **风险**: 时长对齐所有策略失败→ **缓解**: 最终使用截断降级+WARN日志
 
 **参考文档**:
 - Processor-design.md v2.6 第381-488行"关键逻辑步骤"（14步处理流程）
+- Processor-design.md v2.6 第498-510行"音频合成逻辑"（时长对齐策略）
 - Processor-design-detail.md v2.0 第6节"待实现任务清单"
 
 ---
@@ -603,7 +645,7 @@
 **Phase 1: 基础设施搭建**
 - [ ] 创建项目结构（main.go、internal/handler、internal/logic、internal/middleware、internal/svc）
 - [ ] 实现RESTful API服务入口（监听端口8080）
-- [ ] 配置gRPC客户端（Task服务，地址：TASK_RPC_ADDRESS=task:50051）
+- [ ] 配置gRPC客户端（Task服务，地址：TASK_RPC_ADDRESS=task:50050）
 - [ ] 配置Redis连接（配置管理，读取`app:settings`）
 - [ ] 验证Go版本要求（1.21+）
 
@@ -741,7 +783,7 @@
 **里程碑**: M5-Gateway服务完成，所有测试通过，系统可完整运行
 
 **验收标准**:
-- [ ] 可接收文件上传请求并调用Task服务（连接地址：task:50051）
+- [ ] 可接收文件上传请求并调用Task服务（连接地址：task:50050）
 - [ ] 可查询任务状态并返回下载URL
 - [ ] 可提供文件下载（流式传输）
 - [ ] 配置管理功能正常（加密存储+乐观锁）
@@ -777,6 +819,7 @@
 - [ ] 配置环境变量（Redis连接、API密钥、存储路径）
 - [ ] 启动Redis容器（启用AOF持久化）
 - [ ] 验证服务间通信（gRPC健康检查）
+- [ ] **验证端口配置**：确认Task服务监听50050，Gateway连接task:50050
 
 **Phase 2: 端到端测试**
 - [ ] 测试完整的视频翻译流程
@@ -799,6 +842,7 @@
 - [ ] 测试应用配置缺失场景（Processor步骤2应失败并更新状态）
 - [ ] 测试并发处理场景（maxConcurrency=1，多个任务排队处理）
 - [ ] 测试大文件上传场景（2048MB视频，验证流式处理）
+- [ ] 测试时长对齐所有策略（静音填充、语速加速、LLM重译、截断）
 
 **Phase 4: 性能测试**
 - [ ] 测试系统在2C4G服务器上的性能
@@ -862,7 +906,7 @@
 - P1任务是基本功能，完成后服务可运行
 - P2任务是测试和优化，提升稳定性
 - P3任务（扩展功能）在本次开发顺序指南中未包含，留待后续迭代
-- **任务统计说明**：所有服务的任务数量均基于第169-455行的Phase 1-N任务清单统计，与第三层文档的TODO清单基本一致。AudioSeparator任务数量（27个）基于Phase 1-6任务清单估算。
+- **任务统计说明**：所有服务的任务数量均基于第171-458行的Phase 1-N任务清单统计，与第三层文档的TODO清单基本一致
 
 ### 4.2 按阶段分配任务
 
@@ -913,6 +957,7 @@
 - [ ] 14步处理流程可完整执行（使用Mock AI服务）
 - [ ] 步骤2（读取应用配置）和步骤6.5（音频片段切分）正常工作
 - [ ] 步骤11（音频合成）的3个子步骤（拼接、对齐、合并）正常工作
+- [ ] 时长对齐的4个策略决策树正确实现
 - [ ] 并发控制有效（maxConcurrency=1时无并发冲突）
 - [ ] 错误处理正确（任何步骤失败都能正确更新状态）
 - [ ] 单元测试覆盖率>80%
@@ -986,7 +1031,7 @@
 | **服务间通信失败**     | 高   | 低   | ① gRPC健康检查 ② 错误重试 ③ 详细日志                                    |
 | **音频分离质量差**     | 中   | 中   | ① 使用Spleeter 2stems模型 ② 提供CPU/GPU模式选择                         |
 | **声音克隆效果差**     | 中   | 中   | ① 使用阿里云CosyVoice高质量模型 ② 自动选择最佳参考音频                  |
-| **时长对齐失败**       | 中   | 低   | ① 混合策略（静音填充+语速加速+LLM重译+截断） ② 详细日志                 |
+| **时长对齐失败**       | 中   | 低   | ① 4个策略决策树（静音填充→语速加速→LLM重译→截断） ② 详细日志            |
 
 ### 7.2 进度风险
 
@@ -1128,7 +1173,8 @@
 3. **服务依赖顺序严格执行**：AudioSeparator/AIAdaptor（并行） → Task → Processor → Gateway
 4. **充分测试，代码审查**：单元测试覆盖率>80%，每个PR都要Code Review
 5. **及时沟通，文档同步**：发现问题立即沟通，文档变更及时通知
-6. **注意Processor 14步流程**：严格按照第二层文档实现，不要遗漏步骤2和步骤6.5
+6. **注意Processor 14步流程**：严格按照Processor-design.md v2.6实现，不要遗漏步骤2和步骤6.5
+7. **正确配置端口**：Task服务监听50050，Gateway连接task:50050
 
 ### 10.2 成功关键因素
 
@@ -1138,6 +1184,7 @@
 - 适配器模式实现厂商解耦
 - 错误处理保证系统稳定性
 - 14步流程正确实现（包含配置读取和音频片段切分）
+- 时长对齐策略决策树正确实现
 
 **管理层面**:
 - 里程碑验收严格执行
