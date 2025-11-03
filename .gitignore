@@ -10,8 +10,9 @@
 /.idea/
 /YouDub-main
 /notes/my.md
-/notes/YouDub-讨论.md
-/notes/YouDub-文档更新说明-v1.1.md
-/notes/YouDub-项目文档.md
 /notes/image
 notes/YouDub-讨论共识记录.md
+.vscode/settings.json
+.serena/project.yml
+notes/server/reference/
+notes/server/rubbish/

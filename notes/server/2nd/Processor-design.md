@@ -1,12 +1,16 @@
 # Processor 服务设计文档（第二层）
 
-**文档版本**: 2.5
-**关联宏观架构**: `notes/Base-Design.md` v2.1
+**文档版本**: 2.6
+**关联宏观架构**: `notes/Base-Design.md` v2.2
 **最后更新**: 2025-11-02
 **服务定位**: Go 后台服务（无 gRPC 接口），负责 AI 流程编排和音频合成
 
 ## 版本历史
 
+- **v2.6 (2025-11-02)**:
+  - **版本引用修复**：统一更新所有版本引用为 Base-Design.md v2.2
+  - 更新第 10.1 节、第 10.2 节的版本引用
+  - 确保文档版本引用一致性和准确性
 - **v2.5 (2025-11-02)**:
   - **职责补充**：新增步骤 6.5"音频片段切分"，明确由 Processor 负责切分音频片段
   - **接口澄清**：更新步骤 6 的 ASR 输出格式，明确只返回时间戳（不返回 audio_segment_path）
@@ -745,7 +749,7 @@ struct AudioSegment:
 
 ## 10. 与第一层文档的对应关系
 
-本文档是 `notes/Base-Design.md v2.0` 第一层架构文档的细化，对应以下章节：
+本文档是 `notes/Base-Design.md v2.2` 第一层架构文档的细化，对应以下章节：
 
 ### 10.1 对应章节
 
@@ -760,12 +764,12 @@ struct AudioSegment:
 
 ### 10.2 与第一层文档的一致性
 
-- ✅ **拉模式架构**：Processor 服务从 Redis 队列主动拉取任务（与 Base-Design.md v2.0 一致）
-- ✅ **任务队列格式**：`{"task_id": "...", "original_file_path": "..."}`（与 Base-Design.md v2.0 一致）
-- ✅ **并发控制**：使用 Channel 信号量，默认 `maxConcurrency = 1`（与 Base-Design.md v2.0 一致）
-- ✅ **AudioSeparationEnabled 默认值**：false（与 Base-Design.md v2.0 一致）
-- ✅ **文件路径**：使用 `original_file_path` 而非 `original_file_key`（与 Base-Design.md v2.0 一致）
-- ✅ **废弃 gRPC 接口**：不再提供 ProcessVideo gRPC 接口（与 Base-Design.md v2.0 一致）
+- ✅ **拉模式架构**：Processor 服务从 Redis 队列主动拉取任务（与 Base-Design.md v2.2 一致）
+- ✅ **任务队列格式**：`{"task_id": "...", "original_file_path": "..."}`（与 Base-Design.md v2.2 一致）
+- ✅ **并发控制**：使用 Channel 信号量，默认 `maxConcurrency = 1`（与 Base-Design.md v2.2 一致）
+- ✅ **AudioSeparationEnabled 默认值**：false（与 Base-Design.md v2.2 一致）
+- ✅ **文件路径**：使用 `original_file_path` 而非 `original_file_key`（与 Base-Design.md v2.2 一致）
+- ✅ **废弃 gRPC 接口**：不再提供 ProcessVideo gRPC 接口（与 Base-Design.md v2.2 一致）
 
 ---
 
@@ -795,6 +799,8 @@ struct AudioSegment:
 
 | 版本 | 日期       | 变更内容                                                                                                                                                            |
 | ---- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2.6  | 2025-11-02 | 1. **版本引用修复**：统一更新所有版本引用为 Base-Design.md v2.2。 2. 更新第 10.1 节、第 10.2 节的版本引用。 3. 确保文档版本引用一致性和准确性。                   |
+| 2.5  | 2025-11-02 | 1. **职责补充**：新增步骤 6.5"音频片段切分"，明确由 Processor 负责切分音频片段。 2. **接口澄清**：更新步骤 6 的 ASR 输出格式，明确只返回时间戳（不返回 audio_segment_path）。 3. **流程完善**：更新步骤 10 的声音克隆输入，明确使用步骤 6.5 生成的 audio_segment_path。 4. **关联架构更新**：同步 Base-Design.md v2.1 的职责划分变更。 5. **目的**：澄清服务边界，符合单一职责原则。 |
 | 2.4  | 2025-11-01 | **重大更新**：全面完善第二层文档质量，符合 design-rules.md 规范。<br>1. **补充第 3 章"核心数据结构"**：增加 Redis 数据结构（task:pending 队列、task:{task_id} Hash、app:settings Hash）和内存数据结构（ProcessorContext、ComposeRequest、并发控制信号量）。<br>2. **完善第 6 章"服务交互时序图"**：增加错误处理分支（6.2 节）。<br>3. **完善第 8 章"配置项定义"**：增加类型、默认值、是否必填说明（8.1 节）。<br>4. 调整章节编号：第 3 章"任务拉取机制" → 第 4 章，第 4 章"关键逻辑步骤" → 第 5 章，以此类推。 |
 | 2.3  | 2025-10-31 | 1. **修复架构基线冲突**：完全移除 gRPC 推模式的遗留内容。 2. 修复第 5 章时序图为完整的 Redis 拉模式流程。 3. 修复字段命名：`original_file_key` → `original_file_path`。 4. 修复配置项：删除 `PROCESSOR_GRPC_PORT`，增加 Redis 配置。 |
 | 2.2  | 2025-10-30 | 1. 修复路径硬编码问题：所有路径统一使用 `{LOCAL_STORAGE_PATH}` 占位符。 2. 在队列消息示例中增加路径配置说明。 3. 确保与 Gateway-design.md 和 Task-design.md 的路径表示方式保持一致。 |

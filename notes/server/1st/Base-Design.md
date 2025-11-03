@@ -1,11 +1,17 @@
 # **1. 项目基石文档：视频翻译服务 (V1.0)**
 
-**文档版本**: 2.1
+**文档版本**: 2.2
 **最后更新**: 2025年11月02日
 **负责人**: (AI技术合伙人)
 
 ## **版本历史**
 
+- **v2.2 (2025-11-02)**:
+  - **文档完整性修复**: 补充第二层产出物清单，添加 `AIAdaptor-design.md`（第 68 行）
+  - **新增第 5 章**: `ai-adaptor`服务架构设计（服务定位、接口能力、适配器模式、音色管理、架构约束）
+  - **新增第 6 章**: `audio-separator`服务架构设计（服务定位、接口能力、部署模式、架构约束）
+  - **层次过渡**: 每个服务章节新增"与第三层文档的过渡"小节，明确第二层和第三层的边界
+  - **目的**: 确保第一层文档完整覆盖所有 5 个微服务，清晰定义三层文档的过渡关系
 - **v2.1 (2025-11-02)**:
   - **职责澄清**: 明确音频片段切分由 Processor 负责（新增步骤 7.5）
   - **接口简化**: ASR 接口不再返回 `audio_segment_path`，只返回时间戳
@@ -65,7 +71,7 @@
 - **定位**：项目的"部门法"，指导具体编码工作的直接蓝图
 - **内容**：每个微服务的完整 API 契约（.api / .proto 文件）、详细数据结构、核心逻辑步骤、服务交互时序图、错误码清单
 - **命名规范**：`{服务名}-design.md`
-- **产出物**：`Gateway-design.md`、`Task-design.md`、`Processor-design.md`、`AudioSeparator-design.md`
+- **产出物**：`Gateway-design.md`、`Task-design.md`、`Processor-design.md`、`AIAdaptor-design.md`、`AudioSeparator-design.md`
 - **权威性**：**最终 API 契约以第二层文档为准**
 
 **第三层：代码实现与接口文档（开发阶段）**
@@ -371,6 +377,18 @@ Gateway 提供 5 个 RESTful API 接口：
 * **服务可维护性**:
   * **缺少运维接口**: 当前未定义 `/healthz` (健康检查) 和 `/metrics` (监控指标) 接口。这在正式投入生产环境前**必须补充**，以确保服务的可观测性和稳定性。
 
+## **2.5 与第三层文档的过渡**
+
+第二层文档 `Gateway-design.md` 定义了完整的 RESTful API 契约、关键逻辑步骤、错误码清单。
+
+第三层文档 `Gateway-design-detail.md`（开发阶段撰写）将包含：
+- Go-Zero 框架的具体实现代码（Handler、Logic、Types）
+- 文件流式处理的具体实现（multipart/form-data 解析、流式写入）
+- 磁盘空间预检的具体实现
+- API Key 加密/解密的具体实现
+- 路径安全检查的具体实现
+- 单元测试和集成测试
+
 ---
 
 # **3. `task`服务架构设计**
@@ -425,6 +443,17 @@ Task 服务通过 Redis 管理任务数据：
    - 字段: status、result_file_path、error_message、created_at、updated_at 等
 
 > 📋 **详细的字段定义、生命周期说明**请参阅 **`Task-design.md`**。
+
+## **3.4 与第三层文档的过渡**
+
+第二层文档 `Task-design.md` 定义了完整的 gRPC 契约、Redis 数据结构、关键逻辑步骤。
+
+第三层文档 `Task-design-detail.md`（开发阶段撰写）将包含：
+- Go gRPC 服务的具体实现代码（Service、Logic）
+- 文件交接的具体实现（临时文件移动到正式目录）
+- Redis 队列操作的具体实现（LPUSH、HSET、HGETALL）
+- 任务 ID 生成的具体实现（UUID）
+- 单元测试和集成测试
 
 ---
 
@@ -581,6 +610,218 @@ Processor 服务从 Redis 待处理队列（List: `task:pending`）拉取任务�
 * **错误处理**: 任何步骤失败则立即中止，更新 Redis 状态为 FAILED，记录错误信息，释放 worker 槽位。
 
 > 📋 **详细的并发控制策略、错误处理流程、GC 定时任务实现**请参阅 **`Processor-design.md`**。
+
+## **4.4 与第三层文档的过渡**
+
+第二层文档 `Processor-design.md` 定义了完整的 18 步处理流程、AI 服务调用契约、媒体处理逻辑。
+
+第三层文档 `Processor-design-detail.md`（开发阶段撰写）将包含：
+- Go 后台 Worker 的具体实现代码（任务拉取、并发控制、状态更新）
+- ffmpeg 调用的具体实现（音频提取、切分、拼接、合成）
+- 时长对齐算法的具体实现（静音填充、语速调整）
+- AI 服务调用的具体实现（gRPC 客户端）
+- GC 定时任务的具体实现（定时扫描、目录删除）
+- 单元测试和集成测试
+
+---
+
+# **5. `ai-adaptor`服务架构设计**
+
+> ⚠️ **重要提示**：本章仅包含架构级别的服务定位、职责划分和架构原则。
+>
+> **完整的 gRPC 契约、适配器模式设计、关键逻辑步骤、音色管理策略、错误码清单等详细设计，请参阅第二层文档 `AIAdaptor-design.md`**。
+
+## **5.1 服务定位与核心职责**
+
+`ai-adaptor` 服务 (`server/mcp/ai-adaptor`) 是整个系统的**AI 服务适配器层**，负责封装所有外部 AI API 调用，通过适配器模式实现业务逻辑与厂商解耦。
+
+**核心职责**：
+
+* **统一接口**: 为 Processor 提供统一的 AI 服务 gRPC 接口（ASR、翻译、LLM、声音克隆）
+* **适配器管理**: 封装厂商特定逻辑，支持多厂商切换（阿里云、Azure、Google、OpenAI、DeepL 等）
+* **音色管理**: 管理声音克隆的音色注册、缓存、轮询（针对阿里云 CosyVoice）
+* **配置读取**: 从 Redis 读取用户配置的 API 密钥和厂商选择
+* **错误处理**: 统一错误处理和降级策略
+
+**核心理念**:
+- Processor 服务**不直接调用外部 AI API**，而是通过 **ai-adaptor 统一接口**调用。
+- 通过**适配器模式**实现业务逻辑与厂商解耦，未来可无缝切换厂商。
+- 所有 API 密钥从 Redis 读取并解密使用（AES-256-GCM）。
+- 音色管理（注册、缓存、轮询）由 ai-adaptor 负责，Processor 无感知。
+
+## **5.2 接口能力概览**
+
+AIAdaptor 提供 5 个 gRPC 接口：
+
+1. **ASR（语音识别 + 说话人日志）**：
+   - 输入：音频文件路径
+   - 输出：说话人列表，包含句子级时间戳和文本
+   - 支持厂商：阿里云、Azure、Google Cloud（需支持说话人日志）
+
+2. **Polish（文本润色）**：
+   - 输入：原始文本、视频类型、自定义 Prompt
+   - 输出：润色后的文本
+   - 支持厂商：OpenAI GPT、Claude、Gemini
+
+3. **Translate（文本翻译）**：
+   - 输入：原始文本、源语言、目标语言、视频类型
+   - 输出：翻译后的文本
+   - 支持厂商：DeepL、Google Translate、Azure
+
+4. **Optimize（译文优化）**：
+   - 输入：翻译后的文本
+   - 输出：优化后的文本
+   - 支持厂商：OpenAI GPT、Claude、Gemini
+
+5. **CloneVoice（声音克隆）**：
+   - 输入：说话人 ID、合成文本、参考音频路径
+   - 输出：合成的音频路径
+   - 支持厂商：阿里云 CosyVoice（V1.0，零样本克隆）
+
+> 📋 **详细的 gRPC 契约**（Request/Response 字段、适配器接口定义、支持的厂商清单）请参阅 **`AIAdaptor-design.md`**。
+
+## **5.3 适配器模式设计概览**
+
+AIAdaptor 服务通过**适配器模式**实现业务逻辑与厂商解耦：
+
+* **适配器注册表**: 服务启动时注册所有支持的适配器（ASR、Translation、LLM、VoiceCloning）
+* **适配器选择**: 运行时从 Redis 读取用户配置的厂商标识，动态选择对应的适配器
+* **统一接口**: 所有适配器实现统一的接口规范，业务逻辑无需关心具体厂商
+* **厂商隔离**: 厂商特定逻辑（API 调用、参数转换、错误处理）封装在适配器内部
+
+**支持的适配器类型**:
+- **ASR 适配器**: 阿里云、Azure、Google Cloud
+- **翻译适配器**: DeepL、Google Translate、Azure
+- **LLM 适配器**: OpenAI GPT-4o、Claude、Gemini
+- **声音克隆适配器**: 阿里云 CosyVoice
+
+> 📋 **详细的适配器接口定义、适配器实现示例、适配器选择逻辑**请参阅 **`AIAdaptor-design.md`**。
+
+## **5.4 音色管理策略概览**
+
+针对阿里云 CosyVoice 的零样本声音克隆，AIAdaptor 服务实现了完整的音色管理策略：
+
+* **音色注册**: 首次为某个 speaker_id 克隆声音时，自动注册音色到阿里云
+* **音色缓存**: 将注册成功的音色 ID 缓存到 Redis（Key: `voice_cache:{speaker_id}`）
+* **音色轮询**: 注册后轮询查询音色状态，直到可用或超时
+* **缓存复用**: 后续相同 speaker_id 的克隆请求直接使用缓存的音色 ID，无需重复注册
+
+**缓存失效处理**:
+- 如果缓存的音色 ID 失效（阿里云返回 404），自动重新注册
+- 重试策略：最多重试 3 次，每次间隔 5 秒
+- 降级策略：如果重试失败，返回错误给 Processor，由 Processor 决定是否中止任务
+
+> 📋 **详细的音色注册流程、缓存失效处理、重试策略、降级策略**请参阅 **`AIAdaptor-design.md`**。
+
+## **5.5 架构约束**
+
+基于第一层架构定义的核心约束：
+
+* **配置管理**: 所有 API 密钥从 Redis（Key: `app:settings`）读取并解密（AES-256-GCM）
+* **适配器解耦**: 业务逻辑与厂商解耦，未来可无缝切换厂商，业务代码无需修改
+* **错误处理**: 统一错误处理，将厂商特定错误码映射为标准 gRPC 错误码
+* **降级策略**:
+  - 文本润色失败：返回原文
+  - 译文优化失败：返回未优化的翻译
+  - 声音克隆失败：返回错误，由 Processor 决定是否中止任务
+
+> 📋 **详细的错误码清单、错误处理流程、降级策略实现**请参阅 **`AIAdaptor-design.md`**。
+
+## **5.6 与第三层文档的过渡**
+
+第二层文档 `AIAdaptor-design.md` 定义了完整的 gRPC 契约、适配器接口规范、关键逻辑步骤。
+
+第三层文档 `AIAdaptor-design-detail.md`（开发阶段撰写）将包含：
+- 具体的适配器实现代码（AliyunASRAdapter、DeepLAdapter、OpenAIAdapter 等）
+- API 调用细节（HTTP 请求构造、参数转换、响应解析）
+- 音色管理的具体实现（注册、轮询、缓存）
+- 单元测试和集成测试
+
+---
+
+# **6. `audio-separator`服务架构设计**
+
+> ⚠️ **重要提示**：本章仅包含架构级别的服务定位、职责划分和架构原则。
+>
+> **完整的 gRPC 契约、关键逻辑步骤、错误码清单、配置项定义等详细设计，请参阅第二层文档 `AudioSeparator-design.md`**。
+
+## **6.1 服务定位与核心职责**
+
+`audio-separator` 服务 (`server/mcp/audio-separator`) 是一个**独立的 Python gRPC 微服务**，专门负责音频分离任务。它是整个系统中唯一的 Python 服务。
+
+**核心职责**：
+
+* **音频分离**: 使用 Spleeter 模型将音频分离为人声（vocals）和背景音（accompaniment）
+* **gRPC 服务**: 提供 gRPC 接口供 Processor 服务调用
+* **可选启用**: 通过配置开关 `audio_separation_enabled` 控制是否启用
+* **降级处理**: 如果分离失败，返回错误，由 Processor 服务决定是否降级
+
+**核心理念**:
+- 音频分离是**可选功能**，降级不影响核心流程。
+- CPU 模式跳过音频分离（丢失 BGM），GPU 模式启用音频分离（保留 BGM）。
+- 使用 Spleeter 2stems 模型（人声 + 背景音），质量可接受。
+
+## **6.2 接口能力概览**
+
+AudioSeparator 提供 1 个 gRPC 接口：
+
+**SeparateAudio（分离音频）**：
+- 输入：音频文件路径、输出目录、分离模式（stems）
+- 输出：人声文件路径、背景音文件路径、处理耗时
+- 支持模式：2stems（人声 + 背景音，默认）、4stems、5stems
+
+> 📋 **详细的 gRPC 契约**（Request/Response 字段、错误码、处理流程）请参阅 **`AudioSeparator-design.md`**。
+
+## **6.3 部署模式与性能**
+
+AudioSeparator 服务支持两种部署模式：
+
+**CPU 模式**：
+- 使用 TensorFlow CPU 版本
+- 处理速度：10 分钟音频约 5-15 分钟
+- 内存需求：500MB - 1GB（模型加载）
+- 适用场景：无 GPU 资源的用户
+
+**GPU 模式**：
+- 使用 TensorFlow GPU 版本 + CUDA
+- 处理速度：10 分钟音频约 1-2 分钟
+- 显存需求：4GB+
+- 适用场景：追求最佳效果，有 GPU 资源的用户
+
+**并发控制**：
+- 最大并发处理数建议设置为 1（`AUDIO_SEPARATOR_MAX_WORKERS=1`）
+- 原因：Spleeter 模型占用内存较大，并发处理容易导致 OOM
+
+> 📋 **详细的配置项定义、性能优化建议、错误处理策略**请参阅 **`AudioSeparator-design.md`**。
+
+## **6.4 架构约束**
+
+基于第一层架构定义的核心约束：
+
+* **可选功能**: 音频分离是可选功能，如果分离失败，返回错误，由 Processor 决定是否降级
+* **资源管理**:
+  - 最大并发处理数设置为 1，避免内存溢出（OOM）
+  - 模型懒加载，首次调用时加载，后续复用
+* **错误处理**:
+  - 模型加载失败：返回 `INTERNAL` 错误
+  - 内存不足：返回 `RESOURCE_EXHAUSTED` 错误
+  - 处理超时（超过 10 分钟）：返回 `DEADLINE_EXCEEDED` 错误
+* **降级策略**:
+  - 如果音频分离失败，Processor 可选择跳过音频分离，直接使用原音频
+  - CPU 模式默认跳过音频分离（`audio_separation_enabled=false`）
+
+> 📋 **详细的错误码清单、降级策略实现、重试策略**请参阅 **`AudioSeparator-design.md`**。
+
+## **6.5 与第三层文档的过渡**
+
+第二层文档 `AudioSeparator-design.md` 定义了完整的 gRPC 契约、关键逻辑步骤、错误码清单。
+
+第三层文档 `AudioSeparator-design-detail.md`（开发阶段撰写）将包含：
+- Python gRPC 服务的具体实现代码
+- Spleeter 模型加载和调用细节
+- 文件系统操作的具体实现
+- Docker 镜像构建和部署配置
+- 单元测试和集成测试
 
 ---
 
