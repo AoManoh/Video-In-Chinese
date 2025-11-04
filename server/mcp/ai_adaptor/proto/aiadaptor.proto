@@ -1,0 +1,92 @@
+syntax = "proto3";
+
+package aiadaptor;
+
+option go_package = "./proto";
+
+// AIAdaptor 服务定义
+service AIAdaptor {
+  // ASR（语音识别 + 说话人日志）
+  rpc ASR(ASRRequest) returns (ASRResponse);
+  
+  // 文本润色
+  rpc Polish(PolishRequest) returns (PolishResponse);
+  
+  // 翻译
+  rpc Translate(TranslateRequest) returns (TranslateResponse);
+  
+  // 译文优化
+  rpc Optimize(OptimizeRequest) returns (OptimizeResponse);
+  
+  // 声音克隆
+  rpc CloneVoice(CloneVoiceRequest) returns (CloneVoiceResponse);
+}
+
+// ASR 请求
+message ASRRequest {
+  string audio_path = 1;  // 音频文件路径
+}
+
+// ASR 响应
+message ASRResponse {
+  repeated Speaker speakers = 1;  // 说话人列表
+}
+
+message Speaker {
+  string speaker_id = 1;           // 说话人 ID
+  repeated Sentence sentences = 2; // 句子列表
+}
+
+message Sentence {
+  string text = 1;       // 文本内容
+  double start_time = 2; // 开始时间（秒）
+  double end_time = 3;   // 结束时间（秒）
+}
+
+// 文本润色请求
+message PolishRequest {
+  string text = 1;        // 原始文本
+  string video_type = 2;  // 视频类型（professional_tech, casual_natural, educational_rigorous, default）
+  string custom_prompt = 3; // 用户自定义 Prompt（可选）
+}
+
+// 文本润色响应
+message PolishResponse {
+  string polished_text = 1; // 润色后的文本
+}
+
+// 翻译请求
+message TranslateRequest {
+  string text = 1;        // 原始文本
+  string source_lang = 2; // 源语言（默认 en）
+  string target_lang = 3; // 目标语言（默认 zh）
+  string video_type = 4;  // 视频类型（professional_tech, casual_natural, educational_rigorous, default）
+}
+
+// 翻译响应
+message TranslateResponse {
+  string translated_text = 1; // 翻译后的文本
+}
+
+// 译文优化请求
+message OptimizeRequest {
+  string text = 1; // 翻译后的文本
+}
+
+// 译文优化响应
+message OptimizeResponse {
+  string optimized_text = 1; // 优化后的文本
+}
+
+// 声音克隆请求
+message CloneVoiceRequest {
+  string speaker_id = 1;       // 说话人 ID（用于缓存）
+  string text = 2;             // 要合成的文本
+  string reference_audio = 3;  // 参考音频路径
+}
+
+// 声音克隆响应
+message CloneVoiceResponse {
+  string audio_path = 1; // 合成的音频路径
+}
+
