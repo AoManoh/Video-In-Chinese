@@ -1,0 +1,15 @@
+第二层文档：页面与API设计
+
+本目录包含客户端的页面设计文档和API接口定义，是开发人员的直接蓝图。
+
+文档清单：
+- API-Types.md v1.0：API接口类型定义文档（核心）
+- Settings-Page-Design.md v1.0：配置管理页面设计
+- Upload-Page-Design.md v1.0：任务上传页面设计
+- TaskList-Page-Design.md v1.0：任务列表页面设计
+
+文档特点：
+- 完整的TypeScript类型定义
+- 每个API调用都标注对应的后端接口
+- 提供完整的Mock数据示例
+- 包含交互流程图和错误处理策略
