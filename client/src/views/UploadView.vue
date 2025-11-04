@@ -95,6 +95,9 @@ import type { UploadUserFile } from 'element-plus'
 
 const router = useRouter()
 
+// AbortController 用于取消上传
+let uploadAbortController: AbortController | null = null
+
 // 文件验证规则
 const MAX_FILE_SIZE_MB = 2048
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
@@ -235,23 +238,29 @@ const startUpload = async () => {
     }
   }
 
-  // 重置状态
+  // 重置状态并创建新的 AbortController
   uploading.value = true
   uploadProgress.value = 0
   uploadSpeed.value = ''
   lastLoaded = 0
   lastTime = Date.now()
+  uploadAbortController = new AbortController()
 
   try {
-    const response = await uploadTask(selectedFile.value, percent => {
-      uploadProgress.value = percent
-      calculateUploadSpeed((selectedFile.value!.size * percent) / 100)
-    })
+    const response = await uploadTask(
+      selectedFile.value,
+      percent => {
+        uploadProgress.value = percent
+        calculateUploadSpeed((selectedFile.value!.size * percent) / 100)
+      },
+      uploadAbortController.signal
+    )
 
     // 上传成功
     taskId.value = response.task_id
     uploadComplete.value = true
     uploading.value = false
+    uploadAbortController = null
 
     ElMessage.success('上传成功！正在跳转到任务列表...')
 
@@ -260,9 +269,16 @@ const startUpload = async () => {
       goToTaskList()
     }, 3000)
   } catch (error) {
+    // 检查是否是用户取消
+    if (uploadAbortController?.signal.aborted) {
+      // 用户主动取消，不显示错误消息
+      return
+    }
+    
     uploading.value = false
     uploadProgress.value = 0
     uploadSpeed.value = ''
+    uploadAbortController = null
   }
 }
 
@@ -270,7 +286,11 @@ const startUpload = async () => {
  * 取消上传
  */
 const cancelUpload = () => {
-  // TODO: 实现AbortController取消上传
+  if (uploadAbortController) {
+    uploadAbortController.abort()
+    uploadAbortController = null
+  }
+  
   uploading.value = false
   uploadProgress.value = 0
   uploadSpeed.value = ''

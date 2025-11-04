@@ -14,11 +14,13 @@ import type { UploadTaskResponse, GetTaskStatusResponse } from './types'
  * @reference Gateway-design.md v5.9 第289-290行
  * @param file 视频文件
  * @param onProgress 上传进度回调
+ * @param signal AbortSignal 用于取消上传
  * @returns UploadTaskResponse
  */
 export const uploadTask = async (
   file: File,
-  onProgress?: (percent: number) => void
+  onProgress?: (percent: number) => void,
+  signal?: AbortSignal
 ): Promise<UploadTaskResponse> => {
   const formData = new FormData()
   formData.append('file', file)
@@ -32,7 +34,8 @@ export const uploadTask = async (
         const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total)
         onProgress(percent)
       }
-    }
+    },
+    signal
   })
 
   return response.data

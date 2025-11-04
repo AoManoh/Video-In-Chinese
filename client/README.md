@@ -1,5 +1,112 @@
-# Vue 3 + TypeScript + Vite
+# 视频翻译服务 - Web 客户端
 
-This template should help get you started developing with Vue 3 and TypeScript in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+基于 Vue 3 + TypeScript + Vite + Element Plus 构建的视频翻译服务前端应用。
 
-Learn more about the recommended Project Setup and IDE Support in the [Vue Docs TypeScript Guide](https://vuejs.org/guide/typescript/overview.html#project-setup).
+## 功能特性
+
+- 📋 **配置管理** - 管理 ASR、翻译、声音克隆等服务配置
+- 📤 **视频上传** - 支持拖拽上传，实时进度显示
+- 📊 **任务列表** - 任务状态实时轮询，支持结果下载
+- 🔄 **Mock 数据** - 开发环境支持 Mock 数据，无需后端即可调试
+- 💾 **本地持久化** - 任务列表本地存储，刷新不丢失
+
+## 技术栈
+
+- **框架**: Vue 3 (Composition API)
+- **语言**: TypeScript
+- **构建工具**: Vite
+- **UI 组件**: Element Plus
+- **路由**: Vue Router 4
+- **HTTP 客户端**: Axios
+
+## 快速开始
+
+### 安装依赖
+
+```bash
+cd client
+npm install
+```
+
+### 开发模式（Mock 数据）
+
+```bash
+npm run dev
+```
+
+浏览器将自动打开 http://localhost:5173
+
+### 连接真实后端
+
+1. 修改 `.env.development` 文件：
+```env
+VITE_USE_MOCK=false
+VITE_API_BASE_URL=http://localhost:8080
+```
+
+2. 确保后端服务运行在 `http://localhost:8080`
+
+3. 重启开发服务器
+
+### 生产构建
+
+```bash
+npm run build
+```
+
+输出目录：`dist/`
+
+## 项目结构
+
+```
+client/
+├── src/
+│   ├── api/              # API 接口层
+│   │   ├── types.ts      # 类型定义
+│   │   ├── settings-api.ts
+│   │   └── task-api.ts
+│   ├── views/            # 页面组件
+│   │   ├── SettingsView.vue
+│   │   ├── UploadView.vue
+│   │   └── TaskListView.vue
+│   ├── components/       # 通用组件
+│   ├── utils/            # 工具函数
+│   ├── mock/             # Mock 数据
+│   ├── router/           # 路由配置
+│   └── main.ts           # 应用入口
+├── .env.development      # 开发环境配置
+├── .env.production       # 生产环境配置
+└── package.json
+```
+
+## 开发文档
+
+- [开发指南](./DEVELOPMENT.md) - 详细的开发说明和 API 对齐指南
+- [测试指南](./TESTING.md) - 测试流程和验证清单
+- [完成报告](./COMPLETION-REPORT.md) - 项目完成度和交付物清单
+
+## 接口对齐
+
+所有前端 API 调用完全对齐后端 Gateway 接口设计（v5.9）：
+
+- ✅ GET /v1/settings - 获取配置
+- ✅ POST /v1/settings - 更新配置
+- ✅ POST /v1/tasks/upload - 上传任务
+- ✅ GET /v1/tasks/:taskId/status - 查询任务状态
+- ✅ GET /v1/tasks/download/:taskId/:fileName - 下载结果
+
+详细的类型定义和接口说明请查看 `src/api/types.ts`
+
+## 代码规范
+
+```bash
+# 运行 ESLint 检查
+npm run lint
+
+# 构建并检查类型
+npm run build
+```
+
+## License
+
+MIT
