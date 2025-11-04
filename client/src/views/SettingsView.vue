@@ -1,43 +1,27 @@
 <template>
   <div class="settings-page">
-    <el-page-header @back="goBack" content="配置管理" />
+    <!-- 页面头部 -->
+    <div class="page-header">
+      <div class="header-title">
+        <h2>服务配置</h2>
+        <p class="header-subtitle">配置 AI 服务以启用视频翻译功能</p>
+      </div>
+    </div>
 
-    <!-- 初始化向导 -->
+    <!-- 初始化提示 -->
     <el-alert
       v-if="!settings?.is_configured"
-      title="欢迎使用视频翻译服务 🎉"
-      type="info"
+      type="warning"
       :closable="false"
       show-icon
-      class="mt-20 mb-20"
+      class="mb-20"
     >
-      <template #default>
-        <div class="welcome-guide">
-          <p class="guide-intro">
-            本系统可以自动将视频翻译成中文，包括：<strong>语音识别</strong> →
-            <strong>文本翻译</strong> → <strong>声音克隆</strong> →
-            <strong>生成中文配音视频</strong>
-          </p>
-          <p class="guide-steps">
-            请先完成以下<strong>必需配置</strong>（标记为
-            <el-tag type="danger" size="small">必需</el-tag> 的三项）：
-          </p>
-          <ol class="config-list">
-            <li>
-              <strong>ASR服务</strong> - 自动语音识别，将视频中的外语语音转为文字
-            </li>
-            <li>
-              <strong>翻译服务</strong> - 将识别出的外语文字翻译成中文
-            </li>
-            <li>
-              <strong>声音克隆</strong> - 用中文重新配音，保留原视频说话人的声音特征
-            </li>
-          </ol>
-          <p class="guide-tip">
-            💡 提示：其他配置项均为可选，可以提升翻译质量，建议后续再配置
-          </p>
-        </div>
+      <template #title>
+        <span style="font-weight: 600">🚀 快速开始</span>
       </template>
+      <p style="margin: 8px 0 0 0">
+        请完成 <el-tag type="danger" size="small">必填</el-tag> 标记的三项配置（ASR、翻译、声音克隆），即可开始使用视频翻译功能
+      </p>
     </el-alert>
 
     <!-- 配置表单 -->
@@ -46,330 +30,211 @@
       v-loading="loading"
       :model="form"
       :rules="validationRules"
-      label-width="160px"
+      label-width="140px"
       label-position="right"
-      class="settings-form"
     >
-      <!-- 基础配置 -->
-      <el-divider content-position="left">基础配置</el-divider>
-      <el-form-item label="处理模式">
-        <el-tag>标准模式（Standard）</el-tag>
-        <el-text type="info" size="small" class="ml-10">V1.0仅支持标准模式</el-text>
-      </el-form-item>
+      <!-- 核心配置 -->
+      <el-card shadow="never" class="config-section">
+        <template #header>
+          <div class="section-header">
+            <span>核心配置</span>
+            <el-tag type="danger" size="small">必填</el-tag>
+          </div>
+        </template>
 
-      <!-- ASR服务配置（必需） -->
-      <el-divider content-position="left">
-        ASR服务配置
-        <el-tag type="danger" size="small">必需</el-tag>
-      </el-divider>
-      <el-alert type="success" :closable="false" class="mb-20">
-        <template #title>
-          <span>🎙️ 什么是 ASR（自动语音识别）？</span>
-        </template>
-        <div class="config-description">
-          <p>
-            <strong>ASR（Automatic Speech Recognition）</strong
-            >是自动语音识别服务，它能将视频中的语音自动转换成文字。
-          </p>
-          <p class="description-detail">
-            <strong>工作原理：</strong>系统会提取视频中的音频，然后使用 ASR
-            服务将说话内容识别成文字（例如英语、日语等）。
-          </p>
-          <p class="description-example">
-            <strong>举例：</strong>视频中有人说 "Hello, how are you?"，ASR
-            会识别出这段文字。
-          </p>
-          <p class="description-note">
-            💡
-            <strong>推荐服务商：</strong>OpenAI Whisper（支持多种语言，识别准确率高）
-          </p>
-        </div>
-      </el-alert>
-      <el-form-item label="服务商" prop="asr_provider">
-        <el-select v-model="form.asr_provider" placeholder="请选择ASR服务商">
-          <el-option label="OpenAI Whisper" value="openai-whisper" />
-          <el-option label="阿里云语音识别" value="aliyun-asr" />
-          <el-option label="Azure Speech" value="azure-speech" />
-          <el-option label="Google Cloud Speech" value="google-speech" />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="API密钥" prop="asr_api_key">
-        <el-input
-          v-model="form.asr_api_key"
-          type="password"
-          placeholder="请输入API密钥（至少10个字符）"
-          show-password
-        />
-        <template #extra>
-          <el-text type="info" size="small">
-            💡 API密钥是服务商提供的访问凭证，请妥善保管。获取方式：登录服务商官网
-            → 控制台 → API密钥管理
-          </el-text>
-        </template>
-      </el-form-item>
-      <el-form-item label="自定义端点">
-        <el-input v-model="form.asr_endpoint" placeholder="可选，留空使用默认端点" />
-        <template #extra>
-          <el-text type="info" size="small">
-            🔧 高级选项：仅当需要使用自定义服务器地址时填写，例如：https://api.example.com
-          </el-text>
-        </template>
-      </el-form-item>
+        <!-- ASR 语音识别 -->
+        <div class="config-group">
+          <div class="group-title">
+            <span>ASR 语音识别</span>
+            <el-tooltip content="将视频中的外语语音自动转换成文字" placement="top">
+              <el-icon class="help-icon"><QuestionFilled /></el-icon>
+            </el-tooltip>
+          </div>
+          
+          <el-form-item label="服务商" prop="asr_provider">
+            <el-select v-model="form.asr_provider" placeholder="请选择">
+              <el-option label="OpenAI Whisper（推荐）" value="openai-whisper" />
+              <el-option label="阿里云语音识别" value="aliyun-asr" />
+              <el-option label="Azure Speech" value="azure-speech" />
+              <el-option label="Google Cloud Speech" value="google-speech" />
+            </el-select>
+          </el-form-item>
+          
+          <el-form-item label="API 密钥" prop="asr_api_key">
+            <el-input
+              v-model="form.asr_api_key"
+              type="password"
+              placeholder="至少10个字符"
+              show-password
+            />
+          </el-form-item>
 
-      <!-- 音频分离配置 -->
-      <el-divider content-position="left">
-        音频分离配置
-        <el-tag type="info" size="small">可选</el-tag>
-      </el-divider>
-      <el-alert type="info" :closable="false" class="mb-20">
-        <template #title>
-          <span>🎵 什么是音频分离？</span>
-        </template>
-        <div class="config-description">
-          <p>
-            <strong>音频分离</strong>可以将视频中的人声和背景音乐分开，让语音识别更准确。
-          </p>
-          <p class="description-detail">
-            <strong>适用场景：</strong>视频中有背景音乐或噪音时，开启此功能可以提高
-            ASR 识别准确率。
-          </p>
-          <p class="description-note">
-            ⚠️
-            <strong>注意：</strong>此功能需要服务器具备
-            GPU，处理速度会稍慢，如果视频音质清晰可以不开启。
-          </p>
+          <el-form-item label="自定义端点">
+            <el-input v-model="form.asr_endpoint" placeholder="可选，留空使用默认" />
+          </el-form-item>
         </div>
-      </el-alert>
-      <el-form-item label="启用音频分离">
-        <el-switch v-model="form.audio_separation_enabled" />
-        <el-text type="warning" size="small" class="ml-10">需要GPU支持</el-text>
-      </el-form-item>
 
-      <!-- 文本润色配置 -->
-      <el-divider content-position="left">
-        文本润色配置
-        <el-tag type="info" size="small">可选</el-tag>
-      </el-divider>
-      <el-alert type="info" :closable="false" class="mb-20">
-        <template #title>
-          <span>✨ 什么是文本润色？</span>
-        </template>
-        <div class="config-description">
-          <p>
-            <strong>文本润色</strong>会在翻译<strong>之前</strong>，使用
-            AI 对识别出的原文进行优化，纠正错误、补全断句。
-          </p>
-          <p class="description-detail">
-            <strong>工作原理：</strong>ASR 识别的文字可能有错误或不通顺，AI
-            会将其修正为完整、准确的句子后再进行翻译。
-          </p>
-          <p class="description-example">
-            <strong>举例：</strong>ASR 识别为 "he he said um hello" → 润色后为
-            "He said hello"
-          </p>
-          <p class="description-note">
-            💡
-            <strong>推荐：</strong>对于口语化、有停顿的视频（如演讲、访谈）建议开启
-          </p>
-        </div>
-      </el-alert>
-      <el-form-item label="启用文本润色">
-        <el-switch v-model="form.polishing_enabled" />
-      </el-form-item>
-      <template v-if="form.polishing_enabled">
-        <el-form-item label="服务商" prop="polishing_provider">
-          <el-select v-model="form.polishing_provider" placeholder="请选择服务商">
-            <el-option label="OpenAI GPT-4o" value="openai-gpt4o" />
-            <el-option label="Claude 3.5" value="claude-3.5" />
-            <el-option label="Google Gemini" value="google-gemini" />
-            <el-option label="火山引擎 Doubao" value="volcengine-doubao" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="API密钥" prop="polishing_api_key">
-          <el-input
-            v-model="form.polishing_api_key"
-            type="password"
-            placeholder="请输入API密钥"
-            show-password
-          />
-        </el-form-item>
-        <el-form-item label="自定义Prompt">
-          <el-input
-            v-model="form.polishing_custom_prompt"
-            type="textarea"
-            :rows="3"
-            placeholder="可选"
-          />
-        </el-form-item>
-        <el-form-item label="预设类型">
-          <el-select v-model="form.polishing_video_type" placeholder="可选">
-            <el-option label="专业科技" value="professional_tech" />
-            <el-option label="口语自然" value="casual_natural" />
-            <el-option label="教育严谨" value="educational_rigorous" />
-            <el-option label="默认" value="default" />
-          </el-select>
-        </el-form-item>
-      </template>
+        <!-- 翻译服务 -->
+        <div class="config-group">
+          <div class="group-title">
+            <span>翻译服务</span>
+            <el-tooltip content="将识别的外语文字翻译成中文" placement="top">
+              <el-icon class="help-icon"><QuestionFilled /></el-icon>
+            </el-tooltip>
+          </div>
+          
+          <el-form-item label="服务商" prop="translation_provider">
+            <el-select v-model="form.translation_provider" placeholder="请选择">
+              <el-option label="Google Gemini（推荐）" value="google-gemini" />
+              <el-option label="DeepL" value="deepl" />
+              <el-option label="Azure Translator" value="azure-translator" />
+              <el-option label="火山引擎翻译" value="volcengine-translate" />
+            </el-select>
+          </el-form-item>
+          
+          <el-form-item label="API 密钥" prop="translation_api_key">
+            <el-input
+              v-model="form.translation_api_key"
+              type="password"
+              placeholder="至少10个字符"
+              show-password
+            />
+          </el-form-item>
 
-      <!-- 翻译服务配置（必需） -->
-      <el-divider content-position="left">
-        翻译服务配置
-        <el-tag type="danger" size="small">必需</el-tag>
-      </el-divider>
-      <el-alert type="success" :closable="false" class="mb-20">
-        <template #title>
-          <span>🌏 翻译服务是做什么的？</span>
-        </template>
-        <div class="config-description">
-          <p>
-            <strong>翻译服务</strong>负责将 ASR
-            识别出的外语文字翻译成中文文字。
-          </p>
-          <p class="description-detail">
-            <strong>工作流程：</strong>ASR 识别出英文 → 翻译服务转换成中文 →
-            最后用中文重新配音
-          </p>
-          <p class="description-example">
-            <strong>举例：</strong>"Hello, how are you?" → "你好，最近怎么样？"
-          </p>
-          <p class="description-note">
-            💡
-            <strong>推荐服务商：</strong>Google Gemini（翻译自然流畅，支持上下文理解）
-          </p>
-        </div>
-      </el-alert>
-      <el-form-item label="服务商" prop="translation_provider">
-        <el-select v-model="form.translation_provider" placeholder="请选择翻译服务商">
-          <el-option label="Google Gemini" value="google-gemini" />
-          <el-option label="DeepL" value="deepl" />
-          <el-option label="Azure Translator" value="azure-translator" />
-          <el-option label="火山引擎翻译" value="volcengine-translate" />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="API密钥" prop="translation_api_key">
-        <el-input
-          v-model="form.translation_api_key"
-          type="password"
-          placeholder="请输入API密钥"
-          show-password
-        />
-      </el-form-item>
-      <el-form-item label="自定义端点">
-        <el-input v-model="form.translation_endpoint" placeholder="可选，留空使用默认端点" />
-      </el-form-item>
-      <el-form-item label="预设类型">
-        <el-select v-model="form.translation_video_type" placeholder="可选">
-          <el-option label="专业科技" value="professional_tech" />
-          <el-option label="口语自然" value="casual_natural" />
-          <el-option label="教育严谨" value="educational_rigorous" />
-          <el-option label="默认" value="default" />
-        </el-select>
-      </el-form-item>
+          <el-form-item label="自定义端点">
+            <el-input v-model="form.translation_endpoint" placeholder="可选，留空使用默认" />
+          </el-form-item>
 
-      <!-- 译文优化配置 -->
-      <el-divider content-position="left">
-        译文优化配置
-        <el-tag type="info" size="small">可选</el-tag>
-      </el-divider>
-      <el-alert type="info" :closable="false" class="mb-20">
-        <template #title>
-          <span>🎯 什么是译文优化？</span>
-        </template>
-        <div class="config-description">
-          <p>
-            <strong>译文优化</strong>会在翻译<strong>之后</strong>，使用 AI
-            让中文译文更加自然、符合中文表达习惯。
-          </p>
-          <p class="description-detail">
-            <strong>工作原理：</strong>有些直译出来的中文可能生硬、不通顺，AI
-            会将其优化为更地道的中文表达。
-          </p>
-          <p class="description-example">
-            <strong>举例：</strong>直译 "我很好，谢谢" → 优化后 "挺好的，谢谢关心"
-          </p>
-          <p class="description-note">
-            💡
-            <strong>建议：</strong>希望译文更加口语化、自然时开启（会增加一些处理时间）
-          </p>
+          <el-form-item label="翻译风格">
+            <el-select v-model="form.translation_video_type" placeholder="可选">
+              <el-option label="专业科技" value="professional_tech" />
+              <el-option label="口语自然" value="casual_natural" />
+              <el-option label="教育严谨" value="educational_rigorous" />
+            </el-select>
+          </el-form-item>
         </div>
-      </el-alert>
-      <el-form-item label="启用译文优化">
-        <el-switch v-model="form.optimization_enabled" />
-      </el-form-item>
-      <template v-if="form.optimization_enabled">
-        <el-form-item label="服务商" prop="optimization_provider">
-          <el-select v-model="form.optimization_provider" placeholder="请选择服务商">
-            <el-option label="OpenAI GPT-4o" value="openai-gpt4o" />
-            <el-option label="Claude 3.5" value="claude-3.5" />
-            <el-option label="Google Gemini" value="google-gemini" />
-            <el-option label="火山引擎 Doubao" value="volcengine-doubao" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="API密钥" prop="optimization_api_key">
-          <el-input
-            v-model="form.optimization_api_key"
-            type="password"
-            placeholder="请输入API密钥"
-            show-password
-          />
-        </el-form-item>
-      </template>
 
-      <!-- 声音克隆配置（必需） -->
-      <el-divider content-position="left">
-        声音克隆配置
-        <el-tag type="danger" size="small">必需</el-tag>
-      </el-divider>
-      <el-alert type="success" :closable="false" class="mb-20">
-        <template #title>
-          <span>🎤 什么是声音克隆？</span>
-        </template>
-        <div class="config-description">
-          <p>
-            <strong>声音克隆（TTS - Text-to-Speech）</strong
-            >能用中文朗读翻译后的文字，并尽量保持原视频说话人的声音特征。
-          </p>
-          <p class="description-detail">
-            <strong>工作原理：</strong>系统会分析原视频中的声音特点（音色、语调等），然后用中文重新配音，让听起来像是原说话人在说中文。
-          </p>
-          <p class="description-example">
-            <strong>举例：</strong>原视频是男性低沉的声音，生成的中文配音也会是男性低沉的声音。
-          </p>
-          <p class="description-note">
-            💡
-            <strong>推荐服务商：</strong>阿里云 CosyVoice（支持中文声音克隆，音质自然）
-          </p>
+        <!-- 声音克隆 -->
+        <div class="config-group">
+          <div class="group-title">
+            <span>声音克隆</span>
+            <el-tooltip content="用中文重新配音，保持原说话人的声音特征" placement="top">
+              <el-icon class="help-icon"><QuestionFilled /></el-icon>
+            </el-tooltip>
+          </div>
+          
+          <el-form-item label="服务商" prop="voice_cloning_provider">
+            <el-select v-model="form.voice_cloning_provider" placeholder="请选择">
+              <el-option label="阿里云 CosyVoice（推荐）" value="aliyun-cosyvoice" />
+              <el-option label="ElevenLabs" value="elevenlabs" />
+            </el-select>
+          </el-form-item>
+          
+          <el-form-item label="API 密钥" prop="voice_cloning_api_key">
+            <el-input
+              v-model="form.voice_cloning_api_key"
+              type="password"
+              placeholder="至少10个字符"
+              show-password
+            />
+          </el-form-item>
+
+          <el-form-item label="自定义端点">
+            <el-input v-model="form.voice_cloning_endpoint" placeholder="可选，留空使用默认" />
+          </el-form-item>
+
+          <el-form-item label="自动选择参考音频">
+            <el-switch v-model="form.voice_cloning_auto_select_reference" />
+            <el-text type="info" size="small" class="ml-10">推荐开启</el-text>
+          </el-form-item>
         </div>
-      </el-alert>
-      <el-form-item label="服务商" prop="voice_cloning_provider">
-        <el-select v-model="form.voice_cloning_provider" placeholder="请选择声音克隆服务商">
-          <el-option label="阿里云 CosyVoice" value="aliyun-cosyvoice" />
-          <el-option label="ElevenLabs" value="elevenlabs" />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="API密钥" prop="voice_cloning_api_key">
-        <el-input
-          v-model="form.voice_cloning_api_key"
-          type="password"
-          placeholder="请输入API密钥"
-          show-password
-        />
-      </el-form-item>
-      <el-form-item label="自定义端点">
-        <el-input v-model="form.voice_cloning_endpoint" placeholder="可选，留空使用默认端点" />
-      </el-form-item>
-      <el-form-item label="自动选择参考音频">
-        <el-switch v-model="form.voice_cloning_auto_select_reference" />
-        <el-text type="info" size="small" class="ml-10">
-          推荐开启：系统会自动从视频中提取最佳音频片段作为声音参考
-        </el-text>
-      </el-form-item>
+      </el-card>
+
+      <!-- 高级配置（可选） -->
+      <el-card shadow="never" class="config-section mt-20">
+        <template #header>
+          <div class="section-header">
+            <span>高级配置</span>
+            <el-tag type="info" size="small">可选</el-tag>
+          </div>
+        </template>
+
+        <!-- 音频分离 -->
+        <div class="config-group simple">
+          <el-form-item label="音频分离">
+            <el-switch v-model="form.audio_separation_enabled" />
+            <el-tooltip content="分离人声和背景音乐，提高识别准确率（需要GPU）" placement="top">
+              <el-text type="info" size="small" class="ml-10">需要GPU</el-text>
+            </el-tooltip>
+          </el-form-item>
+        </div>
+
+        <!-- 文本润色 -->
+        <div class="config-group">
+          <el-form-item label="文本润色">
+            <el-switch v-model="form.polishing_enabled" />
+            <el-tooltip content="翻译前优化识别的原文，纠正错误和断句" placement="top">
+              <el-text type="info" size="small" class="ml-10">优化原文准确性</el-text>
+            </el-tooltip>
+          </el-form-item>
+          
+          <template v-if="form.polishing_enabled">
+            <el-form-item label="服务商" label-width="120px" prop="polishing_provider">
+              <el-select v-model="form.polishing_provider" placeholder="请选择" size="small">
+                <el-option label="OpenAI GPT-4o" value="openai-gpt4o" />
+                <el-option label="Claude 3.5" value="claude-3.5" />
+                <el-option label="Google Gemini" value="google-gemini" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="API 密钥" label-width="120px" prop="polishing_api_key">
+              <el-input
+                v-model="form.polishing_api_key"
+                type="password"
+                placeholder="请输入API密钥"
+                show-password
+                size="small"
+              />
+            </el-form-item>
+          </template>
+        </div>
+
+        <!-- 译文优化 -->
+        <div class="config-group">
+          <el-form-item label="译文优化">
+            <el-switch v-model="form.optimization_enabled" />
+            <el-tooltip content="翻译后让中文更自然、符合表达习惯" placement="top">
+              <el-text type="info" size="small" class="ml-10">优化译文自然度</el-text>
+            </el-tooltip>
+          </el-form-item>
+          
+          <template v-if="form.optimization_enabled">
+            <el-form-item label="服务商" label-width="120px" prop="optimization_provider">
+              <el-select v-model="form.optimization_provider" placeholder="请选择" size="small">
+                <el-option label="OpenAI GPT-4o" value="openai-gpt4o" />
+                <el-option label="Claude 3.5" value="claude-3.5" />
+                <el-option label="Google Gemini" value="google-gemini" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="API 密钥" label-width="120px" prop="optimization_api_key">
+              <el-input
+                v-model="form.optimization_api_key"
+                type="password"
+                placeholder="请输入API密钥"
+                show-password
+                size="small"
+              />
+            </el-form-item>
+          </template>
+        </div>
+      </el-card>
 
       <!-- 操作按钮 -->
-      <el-form-item>
-        <el-button type="primary" :loading="saving" @click="saveSettings">保存配置</el-button>
-        <el-button @click="resetForm">重置</el-button>
-      </el-form-item>
+      <div class="form-actions mt-30">
+        <el-button type="primary" size="large" :loading="saving" @click="saveSettings">
+          保存配置
+        </el-button>
+        <el-button size="large" @click="resetForm">重置</el-button>
+      </div>
     </el-form>
   </div>
 </template>
@@ -378,6 +243,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
+import { QuestionFilled } from '@element-plus/icons-vue'
 import { getSettings, updateSettings } from '@/api/settings-api'
 import type { GetSettingsResponse, UpdateSettingsRequest } from '@/api/types'
 import { setConfigStatus } from '@/utils/storage'
@@ -511,13 +377,6 @@ const resetForm = () => {
   }
 }
 
-/**
- * 返回上一页
- */
-const goBack = () => {
-  router.back()
-}
-
 onMounted(() => {
   loadSettings()
 })
@@ -525,85 +384,91 @@ onMounted(() => {
 
 <style scoped>
 .settings-page {
-  max-width: 1000px;
+  max-width: 900px;
   margin: 0 auto;
-  padding: 20px;
+  padding: 32px 24px;
 }
 
-.settings-form {
-  margin-top: 20px;
+.page-header {
+  margin-bottom: 24px;
+
+  .header-title h2 {
+    font-size: 28px;
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0 0 8px 0;
+  }
+
+  .header-subtitle {
+    font-size: 14px;
+    color: #6b7280;
+    margin: 0;
+  }
 }
 
-/* 欢迎引导样式 */
-.welcome-guide {
-  line-height: 1.8;
+.config-section {
+  border-radius: var(--app-border-radius);
+  border: 1px solid #e5e7eb;
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    color: #1f2937;
+  }
 }
 
-.guide-intro {
-  font-size: 15px;
-  margin-bottom: 12px;
-  color: #606266;
+.config-group {
+  padding: 20px 0;
+  border-bottom: 1px dashed #e5e7eb;
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &.simple {
+    padding: 12px 0;
+  }
+
+  .group-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 16px;
+
+    .help-icon {
+      color: #9ca3af;
+      cursor: help;
+      font-size: 16px;
+
+      &:hover {
+        color: var(--el-color-primary);
+      }
+    }
+  }
+
+  :deep(.el-form-item) {
+    margin-bottom: 16px;
+  }
+
+  :deep(.el-form-item__label) {
+    font-weight: 500;
+    color: #4b5563;
+  }
 }
 
-.guide-steps {
-  margin: 12px 0 8px 0;
-  color: #303133;
+.form-actions {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  padding: 24px 0;
 }
 
-.config-list {
-  margin: 8px 0 12px 20px;
-  padding-left: 0;
-}
-
-.config-list li {
-  margin-bottom: 8px;
-  color: #606266;
-}
-
-.guide-tip {
-  margin-top: 12px;
-  padding: 8px 12px;
-  background-color: #f0f9ff;
-  border-left: 3px solid #409eff;
-  border-radius: 4px;
-  color: #409eff;
-  font-size: 14px;
-}
-
-/* 配置说明样式 */
-.config-description {
-  line-height: 1.8;
-}
-
-.config-description p {
-  margin: 8px 0;
-  color: #606266;
-}
-
-.config-description strong {
-  color: #303133;
-  font-weight: 600;
-}
-
-.description-detail {
-  padding-left: 12px;
-  border-left: 2px solid #e4e7ed;
-}
-
-.description-example {
-  padding: 8px 12px;
-  background-color: #f5f7fa;
-  border-radius: 4px;
-  font-family: 'Courier New', Courier, monospace;
-  font-size: 13px;
-}
-
-.description-note {
-  color: #409eff !important;
-  font-size: 14px;
-}
-
-/* 工具类 */
 .ml-10 {
   margin-left: 10px;
 }
@@ -612,31 +477,11 @@ onMounted(() => {
   margin-top: 20px;
 }
 
+.mt-30 {
+  margin-top: 30px;
+}
+
 .mb-20 {
   margin-bottom: 20px;
 }
-
-/* 表单额外提示 */
-:deep(.el-form-item__extra) {
-  line-height: 1.6;
-  margin-top: 4px;
-}
-
-/* 分割线优化 */
-:deep(.el-divider__text) {
-  font-weight: 600;
-  font-size: 16px;
-  color: #303133;
-}
-
-/* Alert 优化 */
-:deep(.el-alert) {
-  border-radius: 8px;
-}
-
-:deep(.el-alert__title) {
-  font-size: 15px;
-  font-weight: 600;
-}
 </style>
-
