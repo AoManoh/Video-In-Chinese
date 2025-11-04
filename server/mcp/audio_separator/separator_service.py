@@ -103,6 +103,7 @@ class AudioSeparatorServicer(audioseparator_pb2_grpc.AudioSeparatorServicer):
             )
 
             for stem_name, stem_path in output_paths.items():
+                # 将全部 stems 信息回传客户端，便于调用方自定义后续流程
                 stem_entry = response.stems.add()
                 stem_entry.name = stem_name
                 stem_entry.path = stem_path
@@ -148,6 +149,7 @@ class AudioSeparatorServicer(audioseparator_pb2_grpc.AudioSeparatorServicer):
         task_id = self._extract_task_id(audio_path)
 
         stems = self.config.resolve_stems(request.stems)
+        # 通过配置层的规范化逻辑限制输出目录，防止写入系统敏感位置
         output_dir = self.config.resolve_output_dir(request.output_dir, task_id)
 
         return audio_path, output_dir, stems, task_id
@@ -158,6 +160,7 @@ class AudioSeparatorServicer(audioseparator_pb2_grpc.AudioSeparatorServicer):
             raise RuntimeError("No output files were produced by the separation pipeline")
 
         if len(output_paths) < stems:
+            # Spleeter 应至少输出请求数量的频谱轨道，否则视为异常
             raise RuntimeError(
                 f"Expected at least {stems} stems, received {len(output_paths)}"
             )

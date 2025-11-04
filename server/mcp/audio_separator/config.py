@@ -72,6 +72,7 @@ class AudioSeparatorConfig:
             logging.getLogger(__name__).warning(
                 "Unable to parse stems from model name: %s", model_name
             )
+        # 兜底返回 2 stems，确保后续逻辑至少保持双轨输出
         return 2
 
     def resolve_stems(self, requested_stems: int) -> int:
@@ -94,6 +95,7 @@ class AudioSeparatorConfig:
         if self.output_root:
             root = Path(self.output_root)
             if not resolved.is_relative_to(root):
+                # 说明: 非受控输出路径会强制回落到 output_root/task_id，防止客户端越权写入
                 logging.getLogger(__name__).warning(
                     "Requested output directory %s is outside configured root %s; "
                     "falling back to root/task_id",

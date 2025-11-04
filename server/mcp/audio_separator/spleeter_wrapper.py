@@ -49,6 +49,7 @@ class SpleeterWrapper:
         self.use_gpu = use_gpu
         self.models: Dict[int, Separator] = {}  # 缓存已加载的模型 {stems: model}
         self._lock = threading.RLock()
+        # 使用锁保证多线程访问模型缓存时的原子性，避免重复加载
         logger.info(
             "SpleeterWrapper initialized with model_path=%s, default_model=%s, use_gpu=%s",
             model_path,
@@ -181,6 +182,7 @@ class SpleeterWrapper:
             separation_time = time.time() - start_time
             logger.info(f"Audio separation completed: time={separation_time:.2f}s")
 
+            # 超时判定在一次完整切分后进行，可在日志上提示长耗时任务
             if timeout_seconds and separation_time > timeout_seconds:
                 raise RuntimeError(
                     f"Separation exceeded timeout ({separation_time:.2f}s > {timeout_seconds}s)"
