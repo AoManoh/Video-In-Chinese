@@ -11,6 +11,7 @@ import (
 	"time"
 
 	pb "video-in-chinese/ai_adaptor/proto"
+	"video-in-chinese/ai_adaptor/internal/utils"
 )
 
 // AzureASRAdapter Azure 语音识别适配器
@@ -194,7 +195,7 @@ func (a *AzureASRAdapter) createTranscription(endpoint, audioURL, apiKey string)
 		}
 
 		// 检查是否为不可重试的错误（401, 429）
-		if isNonRetryableError(lastErr) {
+		if utils.IsNonRetryableError(lastErr) {
 			break
 		}
 	}

@@ -35,6 +35,7 @@ export interface GetSettingsResponse {
   polishing_enabled: boolean
   polishing_provider?: string
   polishing_api_key?: string
+  polishing_endpoint?: string
   polishing_custom_prompt?: string
   polishing_video_type?: string
 
@@ -48,6 +49,7 @@ export interface GetSettingsResponse {
   optimization_enabled: boolean
   optimization_provider?: string
   optimization_api_key?: string
+  optimization_endpoint?: string
 
   // 声音克隆配置
   voice_cloning_provider: string
@@ -82,6 +84,7 @@ export interface UpdateSettingsRequest {
   polishing_enabled?: boolean
   polishing_provider?: string
   polishing_api_key?: string
+  polishing_endpoint?: string
   polishing_custom_prompt?: string
   polishing_video_type?: string
 
@@ -93,6 +96,7 @@ export interface UpdateSettingsRequest {
   optimization_enabled?: boolean
   optimization_provider?: string
   optimization_api_key?: string
+  optimization_endpoint?: string
 
   voice_cloning_provider?: string
   voice_cloning_api_key?: string

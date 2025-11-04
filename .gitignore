@@ -17,3 +17,8 @@ notes/YouDub-讨论共识记录.md
 notes/server/reference/
 notes/server/rubbish/
 server/.venv/
+
+# 所有的二进制 exe 文件
+*.exe
+server/mcp/ai_adaptor/ai_adaptor.exe
+.augment/rules/settings.json

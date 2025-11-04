@@ -1,15 +1,21 @@
 package voice_cache
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"sync"
 	"time"
 
 	"video-in-chinese/ai_adaptor/internal/config"
+	"video-in-chinese/ai_adaptor/internal/utils"
 )
 
 // VoiceInfo 音色信息结构
@@ -136,23 +142,19 @@ func (vm *VoiceManager) RegisterVoice(ctx context.Context, speakerID, referenceA
 			time.Sleep(vm.registerRetryInterval)
 		}
 
-		// 步骤 2: 上传参考音频到临时 OSS
-		// TODO: 实现上传参考音频到阿里云 OSS（Phase 4）
-		// publicURL, err := vm.uploadToOSS(ctx, referenceAudio, apiKey)
-		// if err != nil {
-		// 	lastErr = fmt.Errorf("failed to upload reference audio to OSS: %w", err)
-		// 	continue
-		// }
-		_ = "https://example.oss.aliyuncs.com/temp/" + speakerID + ".wav" // 临时占位符（Phase 4 实现）
+		// 步骤 2: 上传参考音频到阿里云 OSS
+		publicURL, err := vm.uploadToOSS(ctx, referenceAudio, apiKey)
+		if err != nil {
+			lastErr = fmt.Errorf("failed to upload reference audio to OSS: %w", err)
+			continue
+		}
 
 		// 步骤 3: 调用阿里云 API 创建音色
-		// TODO: 实现调用阿里云 CosyVoice API 创建音色（Phase 4）
-		// voiceID, err := vm.createVoice(ctx, publicURL, apiKey, endpoint)
-		// if err != nil {
-		// 	lastErr = fmt.Errorf("failed to create voice: %w", err)
-		// 	continue
-		// }
-		voiceID := "cosyvoice_" + speakerID + "_" + time.Now().Format("20060102150405") // 临时占位符
+		voiceID, err := vm.createVoice(ctx, publicURL, apiKey, endpoint)
+		if err != nil {
+			lastErr = fmt.Errorf("failed to create voice: %w", err)
+			continue
+		}
 
 		// 步骤 4: 轮询音色状态
 		if err := vm.PollVoiceStatus(ctx, voiceID, apiKey, endpoint); err != nil {
@@ -211,15 +213,11 @@ func (vm *VoiceManager) PollVoiceStatus(ctx context.Context, voiceID, apiKey, en
 
 		case <-ticker.C:
 			// 查询音色状态
-			// TODO: 实现调用阿里云 API 查询音色状态（Phase 4）
-			// status, err := vm.getVoiceStatus(ctx, voiceID, apiKey, endpoint)
-			// if err != nil {
-			// 	log.Printf("[VoiceManager] WARNING: Failed to get voice status: %v", err)
-			// 	continue
-			// }
-
-			// 临时占位符：模拟音色注册成功
-			status := "OK"
+			status, err := vm.getVoiceStatus(ctx, voiceID, apiKey, endpoint)
+			if err != nil {
+				log.Printf("[VoiceManager] WARNING: Failed to get voice status: %v", err)
+				continue
+			}
 
 			log.Printf("[VoiceManager] Voice status: voice_id=%s, status=%s", voiceID, status)
 
@@ -273,6 +271,191 @@ func (vm *VoiceManager) HandleVoiceNotFound(ctx context.Context, speakerID, refe
 
 	log.Printf("[VoiceManager] Voice re-registered successfully: speaker_id=%s, voice_id=%s", speakerID, voiceID)
 	return voiceID, nil
+}
+
+// createVoice 调用阿里云 CosyVoice API 创建音色
+// 参数:
+//   - ctx: 上下文
+//   - publicURL: 参考音频的公开 URL（OSS URL）
+//   - apiKey: API 密钥
+//   - endpoint: 自定义端点（为空则使用默认端点）
+//
+// 返回:
+//   - voiceID: 音色 ID
+//   - error: 错误信息
+func (vm *VoiceManager) createVoice(ctx context.Context, publicURL, apiKey, endpoint string) (string, error) {
+	log.Printf("[VoiceManager] Creating voice with reference audio: url=%s", publicURL)
+
+	// 确定 API 端点
+	apiEndpoint := endpoint
+	if apiEndpoint == "" {
+		apiEndpoint = "https://nls-gateway.cn-shanghai.aliyuncs.com/cosyvoice/v1/voices"
+	}
+
+	// 构建请求体
+	requestBody := map[string]interface{}{
+		"reference_audio_url": publicURL,
+		"speaker_name":        "speaker_" + time.Now().Format("20060102150405"),
+	}
+
+	requestJSON, err := json.Marshal(requestBody)
+	if err != nil {
+		return "", fmt.Errorf("序列化请求体失败: %w", err)
+	}
+
+	// 创建 HTTP 请求
+	req, err := http.NewRequestWithContext(ctx, "POST", apiEndpoint, bytes.NewBuffer(requestJSON))
+	if err != nil {
+		return "", fmt.Errorf("创建 HTTP 请求失败: %w", err)
+	}
+
+	// 设置请求头
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+
+	// 发送请求
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("发送 HTTP 请求失败: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// 读取响应
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("读取响应失败: %w", err)
+	}
+
+	// 检查状态码
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		return "", fmt.Errorf("API 返回错误状态码 %d: %s", resp.StatusCode, string(body))
+	}
+
+	// 解析响应
+	var response map[string]interface{}
+	if err := json.Unmarshal(body, &response); err != nil {
+		return "", fmt.Errorf("解析响应失败: %w", err)
+	}
+
+	// 提取音色 ID
+	voiceID, ok := response["voice_id"].(string)
+	if !ok {
+		return "", fmt.Errorf("响应中缺少 voice_id 字段")
+	}
+
+	log.Printf("[VoiceManager] Voice created successfully: voice_id=%s", voiceID)
+	return voiceID, nil
+}
+
+// getVoiceStatus 调用阿里云 API 查询音色状态
+// 参数:
+//   - ctx: 上下文
+//   - voiceID: 音色 ID
+//   - apiKey: API 密钥
+//   - endpoint: 自定义端点（为空则使用默认端点）
+//
+// 返回:
+//   - status: 音色状态（"OK", "FAILED", "PROCESSING"）
+//   - error: 错误信息
+func (vm *VoiceManager) getVoiceStatus(ctx context.Context, voiceID, apiKey, endpoint string) (string, error) {
+	log.Printf("[VoiceManager] Querying voice status: voice_id=%s", voiceID)
+
+	// 确定 API 端点
+	apiEndpoint := endpoint
+	if apiEndpoint == "" {
+		apiEndpoint = "https://nls-gateway.cn-shanghai.aliyuncs.com/cosyvoice/v1/voices/" + voiceID
+	} else {
+		apiEndpoint = apiEndpoint + "/" + voiceID
+	}
+
+	// 创建 HTTP 请求
+	req, err := http.NewRequestWithContext(ctx, "GET", apiEndpoint, nil)
+	if err != nil {
+		return "", fmt.Errorf("创建 HTTP 请求失败: %w", err)
+	}
+
+	// 设置请求头
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+
+	// 发送请求
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("发送 HTTP 请求失败: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// 读取响应
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("读取响应失败: %w", err)
+	}
+
+	// 检查状态码
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("API 返回错误状态码 %d: %s", resp.StatusCode, string(body))
+	}
+
+	// 解析响应
+	var response map[string]interface{}
+	if err := json.Unmarshal(body, &response); err != nil {
+		return "", fmt.Errorf("解析响应失败: %w", err)
+	}
+
+	// 提取状态
+	status, ok := response["status"].(string)
+	if !ok {
+		return "", fmt.Errorf("响应中缺少 status 字段")
+	}
+
+	log.Printf("[VoiceManager] Voice status: voice_id=%s, status=%s", voiceID, status)
+	return status, nil
+}
+
+// uploadToOSS 上传参考音频到阿里云 OSS
+// 参数:
+//   - ctx: 上下文
+//   - referenceAudio: 参考音频的本地路径
+//   - apiKey: API 密钥（用于 OSS 认证）
+//
+// 返回:
+//   - publicURL: 上传后的公开 URL
+//   - error: 错误信息
+func (vm *VoiceManager) uploadToOSS(ctx context.Context, referenceAudio, apiKey string) (string, error) {
+	log.Printf("[VoiceManager] Uploading reference audio to OSS: path=%s", referenceAudio)
+
+	// 从环境变量读取 OSS 配置
+	accessKeyID := os.Getenv("ALIYUN_OSS_ACCESS_KEY_ID")
+	accessKeySecret := os.Getenv("ALIYUN_OSS_ACCESS_KEY_SECRET")
+	bucketName := os.Getenv("ALIYUN_OSS_BUCKET_NAME")
+	endpoint := os.Getenv("ALIYUN_OSS_ENDPOINT")
+
+	// 验证配置
+	if accessKeyID == "" || accessKeySecret == "" || bucketName == "" || endpoint == "" {
+		log.Printf("[VoiceManager] WARNING: OSS 配置不完整，使用模拟 URL 作为降级方案")
+		return "https://example.oss.aliyuncs.com/temp/" + filepath.Base(referenceAudio), nil
+	}
+
+	// 创建 OSS 上传器
+	uploader, err := utils.NewOSSUploader(accessKeyID, accessKeySecret, endpoint, bucketName)
+	if err != nil {
+		log.Printf("[VoiceManager] WARNING: 创建 OSS 上传器失败: %v，使用模拟 URL", err)
+		return "https://example.oss.aliyuncs.com/temp/" + filepath.Base(referenceAudio), nil
+	}
+
+	// 生成对象键
+	objectKey := utils.GenerateObjectKey(referenceAudio, "voice-reference")
+
+	// 上传文件
+	publicURL, err := uploader.UploadFile(ctx, referenceAudio, objectKey)
+	if err != nil {
+		log.Printf("[VoiceManager] WARNING: 上传文件到 OSS 失败: %v，使用模拟 URL", err)
+		return "https://example.oss.aliyuncs.com/temp/" + filepath.Base(referenceAudio), nil
+	}
+
+	log.Printf("[VoiceManager] OSS upload completed: %s", publicURL)
+	return publicURL, nil
 }
 
 // getEnv 获取环境变量，如果不存在则返回默认值

@@ -70,7 +70,21 @@
           </el-form-item>
 
           <el-form-item label="自定义端点">
-            <el-input v-model="form.asr_endpoint" placeholder="可选，留空使用默认" />
+            <el-input v-model="form.asr_endpoint" placeholder="例如: https://api.your-proxy.com">
+              <template #append>
+                <el-tooltip placement="top">
+                  <template #content>
+                    <div style="max-width: 300px">
+                      <p style="margin: 0 0 8px 0; font-weight: 600;">自定义端点用途：</p>
+                      <p style="margin: 0 0 8px 0;">• 使用第三方代理服务</p>
+                      <p style="margin: 0 0 8px 0;">• 使用企业内部的 API 网关</p>
+                      <p style="margin: 0; color: #909399; font-size: 12px;">留空则使用官方默认端点</p>
+                    </div>
+                  </template>
+                  <el-icon><QuestionFilled /></el-icon>
+                </el-tooltip>
+              </template>
+            </el-input>
           </el-form-item>
         </div>
 
@@ -86,6 +100,7 @@
           <el-form-item label="服务商" prop="translation_provider">
             <el-select v-model="form.translation_provider" placeholder="请选择">
               <el-option label="Google Gemini（推荐）" value="google-gemini" />
+              <el-option label="自定义 OpenAI 格式 API" value="openai-compatible" />
               <el-option label="DeepL" value="deepl" />
               <el-option label="Azure Translator" value="azure-translator" />
               <el-option label="火山引擎翻译" value="volcengine-translate" />
@@ -102,7 +117,22 @@
           </el-form-item>
 
           <el-form-item label="自定义端点">
-            <el-input v-model="form.translation_endpoint" placeholder="可选，留空使用默认" />
+            <el-input v-model="form.translation_endpoint" placeholder="例如: https://gemini-balance.xxx.com">
+              <template #append>
+                <el-tooltip placement="top">
+                  <template #content>
+                    <div style="max-width: 300px">
+                      <p style="margin: 0 0 8px 0; font-weight: 600;">自定义端点用途：</p>
+                      <p style="margin: 0 0 8px 0;">• 使用第三方代理服务（如 gemini-balance、one-api 等）</p>
+                      <p style="margin: 0 0 8px 0;">• 使用企业内部的 API 网关</p>
+                      <p style="margin: 0 0 8px 0;">• 配置自建的 OpenAI 兼容服务</p>
+                      <p style="margin: 0; color: #909399; font-size: 12px;">留空则使用官方默认端点</p>
+                    </div>
+                  </template>
+                  <el-icon><QuestionFilled /></el-icon>
+                </el-tooltip>
+              </template>
+            </el-input>
           </el-form-item>
 
           <el-form-item label="翻译风格">
@@ -140,7 +170,21 @@
           </el-form-item>
 
           <el-form-item label="自定义端点">
-            <el-input v-model="form.voice_cloning_endpoint" placeholder="可选，留空使用默认" />
+            <el-input v-model="form.voice_cloning_endpoint" placeholder="例如: https://api.your-proxy.com">
+              <template #append>
+                <el-tooltip placement="top">
+                  <template #content>
+                    <div style="max-width: 300px">
+                      <p style="margin: 0 0 8px 0; font-weight: 600;">自定义端点用途：</p>
+                      <p style="margin: 0 0 8px 0;">• 使用第三方代理服务</p>
+                      <p style="margin: 0 0 8px 0;">• 使用企业内部的 API 网关</p>
+                      <p style="margin: 0; color: #909399; font-size: 12px;">留空则使用官方默认端点</p>
+                    </div>
+                  </template>
+                  <el-icon><QuestionFilled /></el-icon>
+                </el-tooltip>
+              </template>
+            </el-input>
           </el-form-item>
 
           <el-form-item label="自动选择参考音频">
@@ -182,6 +226,7 @@
             <el-form-item label="服务商" label-width="120px" prop="polishing_provider">
               <el-select v-model="form.polishing_provider" placeholder="请选择" size="small">
                 <el-option label="OpenAI GPT-4o" value="openai-gpt4o" />
+                <el-option label="自定义 OpenAI 格式" value="openai-compatible" />
                 <el-option label="Claude 3.5" value="claude-3.5" />
                 <el-option label="Google Gemini" value="google-gemini" />
               </el-select>
@@ -192,6 +237,13 @@
                 type="password"
                 placeholder="请输入API密钥"
                 show-password
+                size="small"
+              />
+            </el-form-item>
+            <el-form-item label="自定义端点" label-width="120px" v-if="form.polishing_provider === 'openai-compatible' || form.polishing_provider === 'openai-gpt4o'">
+              <el-input
+                v-model="form.polishing_endpoint"
+                placeholder="例如: https://api.your-proxy.com"
                 size="small"
               />
             </el-form-item>
@@ -211,6 +263,7 @@
             <el-form-item label="服务商" label-width="120px" prop="optimization_provider">
               <el-select v-model="form.optimization_provider" placeholder="请选择" size="small">
                 <el-option label="OpenAI GPT-4o" value="openai-gpt4o" />
+                <el-option label="自定义 OpenAI 格式" value="openai-compatible" />
                 <el-option label="Claude 3.5" value="claude-3.5" />
                 <el-option label="Google Gemini" value="google-gemini" />
               </el-select>
@@ -221,6 +274,13 @@
                 type="password"
                 placeholder="请输入API密钥"
                 show-password
+                size="small"
+              />
+            </el-form-item>
+            <el-form-item label="自定义端点" label-width="120px" v-if="form.optimization_provider === 'openai-compatible' || form.optimization_provider === 'openai-gpt4o'">
+              <el-input
+                v-model="form.optimization_endpoint"
+                placeholder="例如: https://api.your-proxy.com"
                 size="small"
               />
             </el-form-item>
@@ -240,13 +300,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
+import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { QuestionFilled } from '@element-plus/icons-vue'
 import { getSettings, updateSettings } from '@/api/settings-api'
 import type { GetSettingsResponse, UpdateSettingsRequest } from '@/api/types'
 import { setConfigStatus } from '@/utils/storage'
+import {
+  validateAPIKeyFormat,
+  validateEndpointFormat,
+  validateRequiredConfig,
+  getProviderConfigTips,
+  getConfigErrorSuggestion
+} from '@/utils/validation'
 import axios from 'axios'
 
 const router = useRouter()
@@ -311,6 +378,7 @@ const loadSettings = async () => {
       polishing_enabled: settings.value.polishing_enabled,
       polishing_provider: settings.value.polishing_provider || '',
       polishing_api_key: settings.value.polishing_api_key || '',
+      polishing_endpoint: settings.value.polishing_endpoint || '',
       polishing_custom_prompt: settings.value.polishing_custom_prompt || '',
       polishing_video_type: settings.value.polishing_video_type || '',
       translation_provider: settings.value.translation_provider,
@@ -320,6 +388,7 @@ const loadSettings = async () => {
       optimization_enabled: settings.value.optimization_enabled,
       optimization_provider: settings.value.optimization_provider || '',
       optimization_api_key: settings.value.optimization_api_key || '',
+      optimization_endpoint: settings.value.optimization_endpoint || '',
       voice_cloning_provider: settings.value.voice_cloning_provider,
       voice_cloning_api_key: settings.value.voice_cloning_api_key,
       voice_cloning_endpoint: settings.value.voice_cloning_endpoint || '',
@@ -339,6 +408,58 @@ const saveSettings = async () => {
   // 表单验证
   const valid = await formRef.value?.validate().catch(() => false)
   if (!valid) return
+
+  // 格式验证（前端拦截）
+  const formatValidation = validateConfiguration(form.value)
+  if (!formatValidation.valid) {
+    await ElMessageBox.alert(
+      `<div style="max-height: 300px; overflow-y: auto;">
+        <p style="margin-bottom: 12px; font-weight: 600;">发现以下配置问题：</p>
+        <ul style="margin: 0; padding-left: 20px;">
+          ${formatValidation.errors.map(err => `<li style="margin-bottom: 8px;">${err}</li>`).join('')}
+        </ul>
+        <p style="margin-top: 12px; color: #909399; font-size: 13px;">
+          💡 提示：配置错误可能导致任务处理失败，请仔细检查后重新保存
+        </p>
+      </div>`,
+      '配置格式验证失败',
+      {
+        confirmButtonText: '我知道了',
+        dangerouslyUseHTMLString: true,
+        type: 'warning'
+      }
+    )
+    return
+  }
+
+  // HTTPS 安全提示
+  const endpointsToCheck = [
+    form.value.asr_endpoint,
+    form.value.translation_endpoint,
+    form.value.voice_cloning_endpoint,
+    form.value.polishing_endpoint,
+    form.value.optimization_endpoint
+  ].filter(Boolean)
+
+  const hasHttpEndpoint = endpointsToCheck.some(
+    endpoint => endpoint && endpoint.startsWith('http://') && !endpoint.includes('localhost')
+  )
+
+  if (hasHttpEndpoint) {
+    try {
+      await ElMessageBox.confirm(
+        '检测到您使用了 HTTP 协议的自定义端点。为保护 API 密钥安全，强烈建议使用 HTTPS 协议。是否继续保存？',
+        '安全提示',
+        {
+          confirmButtonText: '继续保存',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }
+      )
+    } catch {
+      return // 用户取消
+    }
+  }
 
   saving.value = true
   try {

@@ -8,6 +8,8 @@ import (
 	"log"
 	"net/http"
 	"time"
+
+	"video-in-chinese/ai_adaptor/internal/utils"
 )
 
 // GeminiLLMAdapter Google Gemini LLM 适配器
@@ -34,8 +36,8 @@ type GeminiRequest struct {
 
 // GeminiContent Gemini 对话内容
 type GeminiContent struct {
-	Role  string        `json:"role"`  // 角色（"user" 或 "model"）
-	Parts []GeminiPart  `json:"parts"` // 内容部分列表
+	Role  string       `json:"role"`  // 角色（"user" 或 "model"）
+	Parts []GeminiPart `json:"parts"` // 内容部分列表
 }
 
 // GeminiPart Gemini 内容部分
@@ -59,14 +61,14 @@ type GeminiSafetySetting struct {
 
 // GeminiResponse Gemini API 响应结构
 type GeminiResponse struct {
-	Candidates     []GeminiCandidate `json:"candidates"`     // 候选结果列表
+	Candidates     []GeminiCandidate     `json:"candidates"`               // 候选结果列表
 	PromptFeedback *GeminiPromptFeedback `json:"promptFeedback,omitempty"` // Prompt 反馈
 }
 
 // GeminiCandidate Gemini 候选结果
 type GeminiCandidate struct {
-	Content       GeminiContent `json:"content"`       // 生成的内容
-	FinishReason  string        `json:"finishReason"`  // 完成原因
+	Content       GeminiContent        `json:"content"`       // 生成的内容
+	FinishReason  string               `json:"finishReason"`  // 完成原因
 	SafetyRatings []GeminiSafetyRating `json:"safetyRatings"` // 安全评级
 }
 
@@ -88,6 +90,7 @@ type GeminiPromptFeedback struct {
 //   - customPrompt: 用户自定义 Prompt（可选）
 //   - apiKey: 解密后的 API 密钥（Google Cloud API Key）
 //   - endpoint: 自定义端点 URL（为空则使用默认端点）
+//
 // 返回:
 //   - polishedText: 润色后的文本
 //   - error: 错误信息（401: API密钥无效, 429: API配额不足, 400: Prompt格式错误, 5xx: 外部API服务错误）
@@ -118,6 +121,7 @@ func (g *GeminiLLMAdapter) Polish(text, videoType, customPrompt, apiKey, endpoin
 //   - text: 待优化的文本
 //   - apiKey: 解密后的 API 密钥（Google Cloud API Key）
 //   - endpoint: 自定义端点 URL（为空则使用默认端点）
+//
 // 返回:
 //   - optimizedText: 优化后的文本
 //   - error: 错误信息（401: API密钥无效, 429: API配额不足, 5xx: 外部API服务错误）
@@ -199,7 +203,7 @@ func (g *GeminiLLMAdapter) callGeminiAPI(systemPrompt, userPrompt, apiKey, endpo
 		}
 
 		// 检查是否为不可重试的错误（401, 429, 400）
-		if isNonRetryableError(lastErr) {
+		if utils.IsNonRetryableError(lastErr) {
 			break
 		}
 	}
@@ -295,28 +299,6 @@ func buildPolishPrompt(videoType, customPrompt string) string {
 	}
 }
 
-// isNonRetryableError 判断是否为不可重试的错误
-func isNonRetryableError(err error) bool {
-	if err == nil {
-		return false
-	}
-
-	errMsg := err.Error()
-	// 401/403: API 密钥无效
-	if contains(errMsg, "API 密钥无效") || contains(errMsg, "HTTP 401") || contains(errMsg, "HTTP 403") {
-		return true
-	}
-	// 429: API 配额不足
-	if contains(errMsg, "API 配额不足") || contains(errMsg, "HTTP 429") {
-		return true
-	}
-	// 400: Prompt 格式错误
-	if contains(errMsg, "Prompt 格式错误") || contains(errMsg, "HTTP 400") {
-		return true
-	}
-	return false
-}
-
 // contains 检查字符串是否包含子串
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && (s[:len(substr)] == substr || s[len(s)-len(substr):] == substr || containsSubstring(s, substr)))
@@ -331,4 +313,3 @@ func containsSubstring(s, substr string) bool {
 	}
 	return false
 }
-

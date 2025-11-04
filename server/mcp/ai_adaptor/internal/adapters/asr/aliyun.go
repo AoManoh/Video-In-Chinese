@@ -10,6 +10,7 @@ import (
 	"os"
 	"time"
 
+	"video-in-chinese/ai_adaptor/internal/utils"
 	pb "video-in-chinese/ai_adaptor/proto"
 )
 
@@ -30,21 +31,21 @@ func NewAliyunASRAdapter() *AliyunASRAdapter {
 
 // AliyunASRRequest 阿里云 ASR API 请求结构
 type AliyunASRRequest struct {
-	AppKey          string `json:"appkey"`           // 应用 Key
-	FileLink        string `json:"file_link"`        // 音频文件 URL（OSS 公网地址）
-	Version         string `json:"version"`          // API 版本（默认 "4.0"）
-	EnableWords     bool   `json:"enable_words"`     // 是否返回词级别时间戳
-	EnableSpeaker   bool   `json:"enable_speaker"`   // 是否启用说话人分离
-	SpeakerCount    int    `json:"speaker_count"`    // 说话人数量（0 表示自动检测）
-	EnablePunctuation bool `json:"enable_punctuation"` // 是否启用标点符号
+	AppKey            string `json:"appkey"`             // 应用 Key
+	FileLink          string `json:"file_link"`          // 音频文件 URL（OSS 公网地址）
+	Version           string `json:"version"`            // API 版本（默认 "4.0"）
+	EnableWords       bool   `json:"enable_words"`       // 是否返回词级别时间戳
+	EnableSpeaker     bool   `json:"enable_speaker"`     // 是否启用说话人分离
+	SpeakerCount      int    `json:"speaker_count"`      // 说话人数量（0 表示自动检测）
+	EnablePunctuation bool   `json:"enable_punctuation"` // 是否启用标点符号
 }
 
 // AliyunASRResponse 阿里云 ASR API 响应结构
 type AliyunASRResponse struct {
-	RequestID string                `json:"request_id"` // 请求 ID
-	StatusCode int                  `json:"status_code"` // 状态码（20000000 表示成功）
-	StatusText string               `json:"status_text"` // 状态描述
-	Result     *AliyunASRResult     `json:"result"`      // 识别结果
+	RequestID  string           `json:"request_id"`  // 请求 ID
+	StatusCode int              `json:"status_code"` // 状态码（20000000 表示成功）
+	StatusText string           `json:"status_text"` // 状态描述
+	Result     *AliyunASRResult `json:"result"`      // 识别结果
 }
 
 // AliyunASRResult 阿里云 ASR 识别结果
@@ -54,11 +55,11 @@ type AliyunASRResult struct {
 
 // AliyunSentence 阿里云句子结构
 type AliyunSentence struct {
-	Text         string  `json:"text"`          // 句子文本
-	BeginTime    int64   `json:"begin_time"`    // 开始时间（毫秒）
-	EndTime      int64   `json:"end_time"`      // 结束时间（毫秒）
-	SpeakerID    string  `json:"speaker_id"`    // 说话人 ID（如 "0", "1"）
-	EmotionValue string  `json:"emotion_value"` // 情绪值（可选）
+	Text         string `json:"text"`          // 句子文本
+	BeginTime    int64  `json:"begin_time"`    // 开始时间（毫秒）
+	EndTime      int64  `json:"end_time"`      // 结束时间（毫秒）
+	SpeakerID    string `json:"speaker_id"`    // 说话人 ID（如 "0", "1"）
+	EmotionValue string `json:"emotion_value"` // 情绪值（可选）
 }
 
 // ASR 执行语音识别，返回说话人列表
@@ -66,6 +67,7 @@ type AliyunSentence struct {
 //   - audioPath: 音频文件的本地路径
 //   - apiKey: 解密后的 API 密钥（阿里云 AppKey）
 //   - endpoint: 自定义端点 URL（为空则使用默认端点）
+//
 // 返回:
 //   - speakers: 说话人列表，包含句子级时间戳和文本
 //   - error: 错误信息（401: API密钥无效, 429: API配额不足, 5xx: 外部API服务错误）
@@ -77,10 +79,14 @@ func (a *AliyunASRAdapter) ASR(audioPath, apiKey, endpoint string) ([]*pb.Speake
 		return nil, fmt.Errorf("音频文件不存在: %s", audioPath)
 	}
 
-	// 步骤 2: 上传音频文件到临时存储（OSS 或 Base64）
-	// TODO: 实现音频文件上传到阿里云 OSS，获取公网 URL
-	// 临时方案：使用本地文件路径（实际生产环境需要上传到 OSS）
-	fileLink := audioPath // 临时占位符，Phase 4 后期实现 OSS 上传
+	// 步骤 2: 上传音频文件到阿里云 OSS，获取公网 URL
+	// 注意：OSS 配置需要从 ConfigManager 获取，这里使用环境变量作为临时方案
+	// 生产环境应该通过 logic 层传递完整的 AppConfig
+	fileLink, err := a.uploadToOSS(audioPath)
+	if err != nil {
+		log.Printf("[AliyunASRAdapter] WARNING: OSS upload failed, using local path: %v", err)
+		fileLink = audioPath // 降级方案：使用本地文件路径
+	}
 
 	// 步骤 3: 构建 API 请求
 	requestBody := AliyunASRRequest{
@@ -122,7 +128,7 @@ func (a *AliyunASRAdapter) ASR(audioPath, apiKey, endpoint string) ([]*pb.Speake
 		}
 
 		// 检查是否为不可重试的错误（401, 429）
-		if isNonRetryableError(lastErr) {
+		if utils.IsNonRetryableError(lastErr) {
 			break
 		}
 	}
@@ -237,22 +243,42 @@ func (a *AliyunASRAdapter) parseASRResponse(response *AliyunASRResponse) ([]*pb.
 	return speakers, nil
 }
 
-// isNonRetryableError 判断是否为不可重试的错误
-func isNonRetryableError(err error) bool {
-	if err == nil {
-		return false
+// uploadToOSS 上传音频文件到阿里云 OSS
+//
+// 参数:
+//   - audioPath: 本地音频文件路径
+//
+// 返回:
+//   - publicURL: OSS 公开访问 URL
+//   - error: 错误信息
+func (a *AliyunASRAdapter) uploadToOSS(audioPath string) (string, error) {
+	// 从环境变量读取 OSS 配置
+	accessKeyID := os.Getenv("ALIYUN_OSS_ACCESS_KEY_ID")
+	accessKeySecret := os.Getenv("ALIYUN_OSS_ACCESS_KEY_SECRET")
+	bucketName := os.Getenv("ALIYUN_OSS_BUCKET_NAME")
+	endpoint := os.Getenv("ALIYUN_OSS_ENDPOINT")
+
+	// 验证配置
+	if accessKeyID == "" || accessKeySecret == "" || bucketName == "" || endpoint == "" {
+		return "", fmt.Errorf("OSS 配置不完整，请设置环境变量: ALIYUN_OSS_ACCESS_KEY_ID, ALIYUN_OSS_ACCESS_KEY_SECRET, ALIYUN_OSS_BUCKET_NAME, ALIYUN_OSS_ENDPOINT")
 	}
 
-	errMsg := err.Error()
-	// 401/403: API 密钥无效
-	if contains(errMsg, "API 密钥无效") || contains(errMsg, "HTTP 401") || contains(errMsg, "HTTP 403") {
-		return true
+	// 创建 OSS 上传器
+	uploader, err := utils.NewOSSUploader(accessKeyID, accessKeySecret, endpoint, bucketName)
+	if err != nil {
+		return "", fmt.Errorf("创建 OSS 上传器失败: %w", err)
 	}
-	// 429: API 配额不足
-	if contains(errMsg, "API 配额不足") || contains(errMsg, "HTTP 429") {
-		return true
+
+	// 生成对象键
+	objectKey := utils.GenerateObjectKey(audioPath, "asr-audio")
+
+	// 上传文件
+	publicURL, err := uploader.UploadFile(nil, audioPath, objectKey)
+	if err != nil {
+		return "", fmt.Errorf("上传文件到 OSS 失败: %w", err)
 	}
-	return false
+
+	return publicURL, nil
 }
 
 // contains 检查字符串是否包含子串
@@ -269,4 +295,3 @@ func containsSubstring(s, substr string) bool {
 	}
 	return false
 }
-

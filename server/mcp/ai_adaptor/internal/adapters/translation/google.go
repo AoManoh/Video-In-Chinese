@@ -8,6 +8,8 @@ import (
 	"log"
 	"net/http"
 	"time"
+
+	"video-in-chinese/ai_adaptor/internal/utils"
 )
 
 // GoogleTranslationAdapter Google 翻译适配器
@@ -27,11 +29,11 @@ func NewGoogleTranslationAdapter() *GoogleTranslationAdapter {
 
 // GoogleTranslateRequest Google Translation API 请求结构
 type GoogleTranslateRequest struct {
-	Q            []string `json:"q"`            // 待翻译的文本列表
-	Source       string   `json:"source"`       // 源语言代码（如 "en"）
-	Target       string   `json:"target"`       // 目标语言代码（如 "zh-CN"）
-	Format       string   `json:"format"`       // 文本格式（"text" 或 "html"）
-	Model        string   `json:"model"`        // 翻译模型（"nmt" 或 "base"）
+	Q      []string `json:"q"`      // 待翻译的文本列表
+	Source string   `json:"source"` // 源语言代码（如 "en"）
+	Target string   `json:"target"` // 目标语言代码（如 "zh-CN"）
+	Format string   `json:"format"` // 文本格式（"text" 或 "html"）
+	Model  string   `json:"model"`  // 翻译模型（"nmt" 或 "base"）
 }
 
 // GoogleTranslateResponse Google Translation API 响应结构
@@ -59,6 +61,7 @@ type GoogleTranslation struct {
 //   - videoType: 视频类型（professional_tech, casual_natural, educational_rigorous, default）
 //   - apiKey: 解密后的 API 密钥（Google Cloud API Key）
 //   - endpoint: 自定义端点 URL（为空则使用默认端点）
+//
 // 返回:
 //   - translatedText: 翻译后的文本
 //   - error: 错误信息（401: API密钥无效, 429: API配额不足, 400: 不支持的语言对, 5xx: 外部API服务错误）
@@ -115,7 +118,7 @@ func (g *GoogleTranslationAdapter) Translate(text, sourceLang, targetLang, video
 		}
 
 		// 检查是否为不可重试的错误（401, 429, 400）
-		if isNonRetryableError(lastErr) {
+		if utils.IsNonRetryableError(lastErr) {
 			break
 		}
 	}
@@ -211,28 +214,6 @@ func normalizeLanguageCode(langCode string) string {
 	}
 }
 
-// isNonRetryableError 判断是否为不可重试的错误
-func isNonRetryableError(err error) bool {
-	if err == nil {
-		return false
-	}
-
-	errMsg := err.Error()
-	// 401/403: API 密钥无效
-	if contains(errMsg, "API 密钥无效") || contains(errMsg, "HTTP 401") || contains(errMsg, "HTTP 403") {
-		return true
-	}
-	// 429: API 配额不足
-	if contains(errMsg, "API 配额不足") || contains(errMsg, "HTTP 429") {
-		return true
-	}
-	// 400: 不支持的语言对或请求参数错误
-	if contains(errMsg, "不支持的语言对") || contains(errMsg, "HTTP 400") {
-		return true
-	}
-	return false
-}
-
 // contains 检查字符串是否包含子串
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && (s[:len(substr)] == substr || s[len(s)-len(substr):] == substr || containsSubstring(s, substr)))
@@ -247,4 +228,3 @@ func containsSubstring(s, substr string) bool {
 	}
 	return false
 }
-

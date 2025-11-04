@@ -11,9 +11,11 @@ import (
 // AppConfig 应用配置结构
 type AppConfig struct {
 	// ASR 配置
-	ASRProvider  string
-	ASRAPIKey    string // 解密后的 API 密钥
-	ASREndpoint  string
+	ASRProvider     string
+	ASRAPIKey       string // 解密后的 API 密钥
+	ASREndpoint     string
+	ASRLanguageCode string // 语言代码（如 "zh-CN", "en-US"）
+	ASRRegion       string // 区域信息（Azure ASR 需要）
 
 	// 翻译配置
 	TranslationProvider  string
@@ -28,18 +30,28 @@ type AppConfig struct {
 	PolishingEndpoint     string
 	PolishingVideoType    string
 	PolishingCustomPrompt string
+	PolishingModelName    string // LLM 模型名称（如 "gpt-4o", "gemini-1.5-flash"）
 
 	// 译文优化配置
-	OptimizationEnabled  bool
-	OptimizationProvider string
-	OptimizationAPIKey   string
-	OptimizationEndpoint string
+	OptimizationEnabled   bool
+	OptimizationProvider  string
+	OptimizationAPIKey    string
+	OptimizationEndpoint  string
+	OptimizationModelName string // LLM 模型名称
 
 	// 声音克隆配置
 	VoiceCloningProvider            string
 	VoiceCloningAPIKey              string
 	VoiceCloningEndpoint            string
 	VoiceCloningAutoSelectReference bool
+	VoiceCloningOutputDir           string // 音频输出目录
+
+	// 阿里云 OSS 配置（用于文件上传）
+	AliyunOSSAccessKeyID     string
+	AliyunOSSAccessKeySecret string
+	AliyunOSSBucketName      string
+	AliyunOSSEndpoint        string
+	AliyunOSSRegion          string
 
 	// 元数据
 	LoadedAt time.Time // 配置加载时间
@@ -51,7 +63,7 @@ type ConfigManager struct {
 	cryptoManager *CryptoManager
 
 	// 配置缓存
-	cache      *AppConfig
+	cache       *AppConfig
 	cacheExpiry time.Time
 	cacheTTL    time.Duration
 	mu          sync.RWMutex
@@ -168,6 +180,8 @@ func (m *ConfigManager) parseConfig(settings map[string]string) (*AppConfig, err
 		config.ASRAPIKey = decryptedKey
 	}
 	config.ASREndpoint = settings["asr_endpoint"]
+	config.ASRLanguageCode = settings["asr_language_code"]
+	config.ASRRegion = settings["asr_region"]
 
 	// 解析翻译配置
 	config.TranslationProvider = settings["translation_provider"]
@@ -194,6 +208,7 @@ func (m *ConfigManager) parseConfig(settings map[string]string) (*AppConfig, err
 	config.PolishingEndpoint = settings["polishing_endpoint"]
 	config.PolishingVideoType = settings["polishing_video_type"]
 	config.PolishingCustomPrompt = settings["polishing_custom_prompt"]
+	config.PolishingModelName = settings["polishing_model_name"]
 
 	// 解析译文优化配置
 	config.OptimizationEnabled = settings["optimization_enabled"] == "true"
@@ -206,6 +221,7 @@ func (m *ConfigManager) parseConfig(settings map[string]string) (*AppConfig, err
 		config.OptimizationAPIKey = decryptedKey
 	}
 	config.OptimizationEndpoint = settings["optimization_endpoint"]
+	config.OptimizationModelName = settings["optimization_model_name"]
 
 	// 解析声音克隆配置
 	config.VoiceCloningProvider = settings["voice_cloning_provider"]
@@ -218,6 +234,26 @@ func (m *ConfigManager) parseConfig(settings map[string]string) (*AppConfig, err
 	}
 	config.VoiceCloningEndpoint = settings["voice_cloning_endpoint"]
 	config.VoiceCloningAutoSelectReference = settings["voice_cloning_auto_select_reference"] == "true"
+	config.VoiceCloningOutputDir = settings["voice_cloning_output_dir"]
+
+	// 解析阿里云 OSS 配置
+	if encryptedKey := settings["aliyun_oss_access_key_id"]; encryptedKey != "" {
+		decryptedKey, err := m.cryptoManager.DecryptAPIKey(encryptedKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decrypt aliyun_oss_access_key_id: %w", err)
+		}
+		config.AliyunOSSAccessKeyID = decryptedKey
+	}
+	if encryptedKey := settings["aliyun_oss_access_key_secret"]; encryptedKey != "" {
+		decryptedKey, err := m.cryptoManager.DecryptAPIKey(encryptedKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decrypt aliyun_oss_access_key_secret: %w", err)
+		}
+		config.AliyunOSSAccessKeySecret = decryptedKey
+	}
+	config.AliyunOSSBucketName = settings["aliyun_oss_bucket_name"]
+	config.AliyunOSSEndpoint = settings["aliyun_oss_endpoint"]
+	config.AliyunOSSRegion = settings["aliyun_oss_region"]
 
 	return config, nil
 }
@@ -322,4 +358,3 @@ func (m *ConfigManager) InvalidateCache() {
 	m.cacheExpiry = time.Time{}
 	log.Println("[ConfigManager] Cache invalidated")
 }
-

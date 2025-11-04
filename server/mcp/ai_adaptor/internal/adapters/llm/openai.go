@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"video-in-chinese/ai_adaptor/internal/utils"
 )
 
 // OpenAILLMAdapter OpenAI 格式 LLM 适配器
@@ -29,11 +31,11 @@ func NewOpenAILLMAdapter() *OpenAILLMAdapter {
 
 // OpenAIChatRequest OpenAI Chat Completions API 请求结构
 type OpenAIChatRequest struct {
-	Model       string                `json:"model"`       // 模型名称（如 "gpt-4o", "gpt-3.5-turbo"）
-	Messages    []OpenAIChatMessage   `json:"messages"`    // 对话消息列表
-	Temperature float64               `json:"temperature"` // 温度（0.0-2.0）
-	MaxTokens   int                   `json:"max_tokens"`  // 最大输出 Token 数
-	TopP        float64               `json:"top_p"`       // Top-P 采样
+	Model       string              `json:"model"`       // 模型名称（如 "gpt-4o", "gpt-3.5-turbo"）
+	Messages    []OpenAIChatMessage `json:"messages"`    // 对话消息列表
+	Temperature float64             `json:"temperature"` // 温度（0.0-2.0）
+	MaxTokens   int                 `json:"max_tokens"`  // 最大输出 Token 数
+	TopP        float64             `json:"top_p"`       // Top-P 采样
 }
 
 // OpenAIChatMessage OpenAI 对话消息
@@ -44,12 +46,12 @@ type OpenAIChatMessage struct {
 
 // OpenAIChatResponse OpenAI Chat Completions API 响应结构
 type OpenAIChatResponse struct {
-	ID      string                 `json:"id"`      // 响应 ID
-	Object  string                 `json:"object"`  // 对象类型（"chat.completion"）
-	Created int64                  `json:"created"` // 创建时间戳
-	Model   string                 `json:"model"`   // 使用的模型
-	Choices []OpenAIChatChoice     `json:"choices"` // 候选结果列表
-	Usage   OpenAIChatUsage        `json:"usage"`   // Token 使用情况
+	ID      string             `json:"id"`      // 响应 ID
+	Object  string             `json:"object"`  // 对象类型（"chat.completion"）
+	Created int64              `json:"created"` // 创建时间戳
+	Model   string             `json:"model"`   // 使用的模型
+	Choices []OpenAIChatChoice `json:"choices"` // 候选结果列表
+	Usage   OpenAIChatUsage    `json:"usage"`   // Token 使用情况
 }
 
 // OpenAIChatChoice OpenAI 候选结果
@@ -73,6 +75,7 @@ type OpenAIChatUsage struct {
 //   - customPrompt: 用户自定义 Prompt（可选）
 //   - apiKey: 解密后的 API 密钥（OpenAI API Key 或第三方中转服务 API Key）
 //   - endpoint: 自定义端点 URL（为空则使用默认端点 https://api.openai.com）
+//
 // 返回:
 //   - polishedText: 润色后的文本
 //   - error: 错误信息（401: API密钥无效, 429: API配额不足, 400: Prompt格式错误, 5xx: 外部API服务错误）
@@ -103,6 +106,7 @@ func (o *OpenAILLMAdapter) Polish(text, videoType, customPrompt, apiKey, endpoin
 //   - text: 待优化的文本
 //   - apiKey: 解密后的 API 密钥（OpenAI API Key 或第三方中转服务 API Key）
 //   - endpoint: 自定义端点 URL（为空则使用默认端点 https://api.openai.com）
+//
 // 返回:
 //   - optimizedText: 优化后的文本
 //   - error: 错误信息（401: API密钥无效, 429: API配额不足, 5xx: 外部API服务错误）
@@ -177,7 +181,7 @@ func (o *OpenAILLMAdapter) callOpenAIAPI(systemPrompt, userPrompt, apiKey, endpo
 		}
 
 		// 检查是否为不可重试的错误（401, 429, 400）
-		if isNonRetryableError(lastErr) {
+		if utils.IsNonRetryableError(lastErr) {
 			break
 		}
 	}
@@ -246,53 +250,3 @@ func (o *OpenAILLMAdapter) sendOpenAIRequest(endpoint string, requestJSON []byte
 
 	return &chatResponse, nil
 }
-
-// buildPolishPrompt 构建文本润色 Prompt
-func buildPolishPrompt(videoType, customPrompt string) string {
-	// 如果用户提供了自定义 Prompt，则使用自定义 Prompt
-	if customPrompt != "" {
-		return customPrompt
-	}
-
-	// 根据视频类型构建默认 Prompt
-	basePrompt := "你是一位专业的文本润色专家。请润色以下文本，使其更加流畅、自然、符合表达习惯。保持原意不变，只优化表达方式。"
-
-	switch videoType {
-	case "professional_tech":
-		return basePrompt + "\n\n特别要求：保持专业术语的准确性，使用正式的技术文档风格。"
-	case "casual_natural":
-		return basePrompt + "\n\n特别要求：使用轻松、自然的口语化表达，避免过于正式的用词。"
-	case "educational_rigorous":
-		return basePrompt + "\n\n特别要求：保持严谨的学术风格，确保逻辑清晰、表达准确。"
-	default:
-		return basePrompt
-	}
-}
-
-// isNonRetryableError 判断是否为不可重试的错误
-func isNonRetryableError(err error) bool {
-	if err == nil {
-		return false
-	}
-
-	errMsg := err.Error()
-	// 401/403: API 密钥无效
-	if contains(errMsg, "API 密钥无效") || contains(errMsg, "HTTP 401") || contains(errMsg, "HTTP 403") {
-		return true
-	}
-	// 429: API 配额不足
-	if contains(errMsg, "API 配额不足") || contains(errMsg, "HTTP 429") {
-		return true
-	}
-	// 400: Prompt 格式错误
-	if contains(errMsg, "Prompt 格式错误") || contains(errMsg, "HTTP 400") {
-		return true
-	}
-	return false
-}
-
-// contains 检查字符串是否包含子串
-func contains(s, substr string) bool {
-	return strings.Contains(s, substr)
-}
-

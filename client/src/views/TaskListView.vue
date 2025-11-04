@@ -55,6 +55,7 @@ import { getTaskStatus, downloadFile, triggerDownload } from '@/api/task-api'
 import type { Task } from '@/api/types'
 import { getTaskList, setTaskList, addTask as addTaskToStorage, updateTask } from '@/utils/storage'
 import { taskPoller } from '@/utils/task-poller'
+import { getConfigErrorSuggestion } from '@/utils/validation'
 import type { GetTaskStatusResponse } from '@/api/types'
 
 const router = useRouter()
@@ -109,16 +110,43 @@ const updateTaskStatus = (taskId: string, response: GetTaskStatusResponse) => {
   if (oldStatus !== response.status) {
     if (response.status === 'COMPLETED') {
       ElNotification.success({
-        title: '任务完成',
+        title: '✅ 任务完成',
         message: `任务 ${taskId.slice(0, 8)} 已完成，可以下载结果`,
         duration: 0
       })
     } else if (response.status === 'FAILED') {
+      // 检查是否为配置相关错误
+      const errorMessage = response.error_message || '未知错误'
+      const suggestion = getConfigErrorSuggestion(errorMessage)
+      
+      // 构建错误提示
+      let notificationMessage = `任务 ${taskId.slice(0, 8)} 处理失败：${errorMessage}`
+      if (suggestion) {
+        notificationMessage += `\n\n${suggestion}`
+      }
+      
       ElNotification.error({
-        title: '任务失败',
-        message: `任务 ${taskId.slice(0, 8)} 处理失败：${response.error_message}`,
-        duration: 0
+        title: '❌ 任务失败',
+        message: notificationMessage,
+        duration: 0,
+        dangerouslyUseHTMLString: false
       })
+      
+      // 如果是配置错误，额外提示用户前往配置页面
+      if (
+        errorMessage.includes('API 密钥') ||
+        errorMessage.includes('配置') ||
+        errorMessage.includes('401') ||
+        errorMessage.includes('403')
+      ) {
+        setTimeout(() => {
+          ElMessage.warning({
+            message: '建议前往"服务配置"页面检查 API 密钥设置',
+            duration: 5000,
+            showClose: true
+          })
+        }, 1000)
+      }
     }
   }
 }

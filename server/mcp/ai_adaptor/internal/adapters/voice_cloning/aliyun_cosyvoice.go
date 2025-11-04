@@ -3,6 +3,7 @@ package voice_cloning
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,6 +13,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"video-in-chinese/ai_adaptor/internal/utils"
 	"video-in-chinese/ai_adaptor/internal/voice_cache"
 )
 
@@ -54,9 +56,11 @@ type AliyunSynthesizeResponse struct {
 //   - referenceAudio: 参考音频路径
 //   - apiKey: 解密后的 API 密钥
 //   - endpoint: 自定义端点 URL（为空则使用默认端点）
+//
 // 返回:
 //   - audioPath: 合成的音频路径
 //   - error: 错误信息（401: API密钥无效, 429: API配额不足, 404: 音色不存在, 408: 音色注册超时, 5xx: 外部API服务错误）
+//
 // 注意: 音色管理逻辑（缓存检查、音色注册、轮询）由 VoiceManager 实现
 func (a *AliyunCosyVoiceAdapter) CloneVoice(speakerID, text, referenceAudio, apiKey, endpoint string) (string, error) {
 	log.Printf("[AliyunCosyVoiceAdapter] Starting voice cloning: speaker_id=%s", speakerID)
@@ -87,17 +91,15 @@ func (a *AliyunCosyVoiceAdapter) CloneVoice(speakerID, text, referenceAudio, api
 		// 检查是否为音色不存在错误（404）
 		if contains(err.Error(), "音色不存在") || contains(err.Error(), "HTTP 404") {
 			log.Printf("[AliyunCosyVoiceAdapter] Voice not found, invalidating cache and retrying: voice_id=%s", voiceID)
-			
+
 			// 音色失效，清除缓存并重新注册
-			if retryErr := a.voiceManager.HandleVoiceNotFound(ctx, speakerID, referenceAudio, apiKey, endpoint); retryErr != nil {
+			newVoiceID, retryErr := a.voiceManager.HandleVoiceNotFound(ctx, speakerID, referenceAudio, apiKey, endpoint)
+			if retryErr != nil {
 				return "", fmt.Errorf("音色失效处理失败: %w", retryErr)
 			}
 
-			// 重新获取音色 ID
-			voiceID, err = a.voiceManager.GetOrRegisterVoice(ctx, speakerID, referenceAudio, apiKey, endpoint)
-			if err != nil {
-				return "", fmt.Errorf("重新获取音色失败: %w", err)
-			}
+			// 使用重新注册后的音色 ID
+			voiceID = newVoiceID
 
 			// 重新合成音频
 			audioData, err = a.synthesizeAudio(voiceID, text, apiKey, endpoint)
@@ -137,9 +139,11 @@ func (a *AliyunCosyVoiceAdapter) synthesizeAudio(voiceID, text, apiKey, endpoint
 	// 步骤 3: 确定 API 端点
 	apiEndpoint := endpoint
 	if apiEndpoint == "" {
-		// 使用默认端点（阿里云 CosyVoice 音频合成 API）
-		// TODO: 从配置中读取默认端点（Phase 4 后期实现）
-		apiEndpoint = "https://nls-gateway.cn-shanghai.aliyuncs.com/cosyvoice/v1/synthesize"
+		// 从环境变量读取默认端点，如果未设置则使用阿里云官方端点
+		apiEndpoint = os.Getenv("ALIYUN_COSYVOICE_ENDPOINT")
+		if apiEndpoint == "" {
+			apiEndpoint = "https://nls-gateway.cn-shanghai.aliyuncs.com/cosyvoice/v1/synthesize"
+		}
 	}
 
 	// 步骤 4: 发送 HTTP POST 请求（带重试逻辑）
@@ -158,7 +162,7 @@ func (a *AliyunCosyVoiceAdapter) synthesizeAudio(voiceID, text, apiKey, endpoint
 		}
 
 		// 检查是否为不可重试的错误（401, 429, 404）
-		if isNonRetryableError(lastErr) {
+		if utils.IsNonRetryableError(lastErr) {
 			break
 		}
 	}
@@ -168,15 +172,12 @@ func (a *AliyunCosyVoiceAdapter) synthesizeAudio(voiceID, text, apiKey, endpoint
 	}
 
 	// 步骤 5: 解码 Base64 音频数据
-	// TODO: 实现 Base64 解码（Phase 4 后期实现）
-	// audioData, err := base64.StdEncoding.DecodeString(response.AudioData)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("解码音频数据失败: %w", err)
-	// }
+	audioData, err := base64.StdEncoding.DecodeString(response.AudioData)
+	if err != nil {
+		return nil, fmt.Errorf("解码音频数据失败: %w", err)
+	}
 
-	// 临时占位符：返回空音频数据
-	audioData := []byte("RIFF....WAVEfmt ....") // 临时占位符（Phase 4 后期实现）
-
+	log.Printf("[AliyunCosyVoiceAdapter] Audio synthesized successfully: size=%d bytes", len(audioData))
 	return audioData, nil
 }
 
@@ -239,8 +240,12 @@ func (a *AliyunCosyVoiceAdapter) sendSynthesizeRequest(endpoint string, requestJ
 // saveAudioFile 保存音频文件到本地
 func (a *AliyunCosyVoiceAdapter) saveAudioFile(audioData []byte, speakerID string) (string, error) {
 	// 步骤 1: 创建输出目录
-	// TODO: 从配置中读取输出目录（Phase 4 后期实现）
-	outputDir := "./output/cloned_voices"
+	// 从环境变量读取输出目录，如果未设置则使用默认值
+	outputDir := os.Getenv("CLONED_VOICE_OUTPUT_DIR")
+	if outputDir == "" {
+		outputDir = "./output/cloned_voices" // 默认输出目录
+	}
+
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
 		return "", fmt.Errorf("创建输出目录失败: %w", err)
 	}
@@ -259,28 +264,6 @@ func (a *AliyunCosyVoiceAdapter) saveAudioFile(audioData []byte, speakerID strin
 	return audioPath, nil
 }
 
-// isNonRetryableError 判断是否为不可重试的错误
-func isNonRetryableError(err error) bool {
-	if err == nil {
-		return false
-	}
-
-	errMsg := err.Error()
-	// 401/403: API 密钥无效
-	if contains(errMsg, "API 密钥无效") || contains(errMsg, "HTTP 401") || contains(errMsg, "HTTP 403") {
-		return true
-	}
-	// 429: API 配额不足
-	if contains(errMsg, "API 配额不足") || contains(errMsg, "HTTP 429") {
-		return true
-	}
-	// 404: 音色不存在（需要特殊处理，但不重试当前请求）
-	if contains(errMsg, "音色不存在") || contains(errMsg, "HTTP 404") {
-		return true
-	}
-	return false
-}
-
 // contains 检查字符串是否包含子串
 func contains(s, substr string) bool {
 	for i := 0; i <= len(s)-len(substr); i++ {
@@ -290,4 +273,3 @@ func contains(s, substr string) bool {
 	}
 	return false
 }
-

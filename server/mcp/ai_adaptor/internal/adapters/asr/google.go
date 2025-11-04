@@ -12,6 +12,7 @@ import (
 	"time"
 
 	pb "video-in-chinese/ai_adaptor/proto"
+	"video-in-chinese/ai_adaptor/internal/utils"
 )
 
 // GoogleASRAdapter Google 语音识别适配器
@@ -158,7 +159,7 @@ func (g *GoogleASRAdapter) ASR(audioPath, apiKey, endpoint string) ([]*pb.Speake
 		}
 
 		// 检查是否为不可重试的错误（401, 429）
-		if isNonRetryableError(lastErr) {
+		if utils.IsNonRetryableError(lastErr) {
 			break
 		}
 	}
