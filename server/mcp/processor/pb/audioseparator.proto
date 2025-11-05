@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package audioseparator;
+
+option go_package = "./pb";
+
+// AudioSeparator 服务定义
+service AudioSeparator {
+  // 分离音频为多种 stems
+  rpc SeparateAudio(SeparateAudioRequest) returns (SeparateAudioResponse);
+}
+
+// 分离音频请求
+message SeparateAudioRequest {
+  string audio_path = 1;  // 输入音频文件的绝对路径
+  string output_dir = 2;  // 输出目录的绝对路径
+  int32 stems = 3;        // 分离模式，2/4/5 stems，0 表示使用默认值
+}
+
+// 分离结果中的单个 stem 文件
+message SeparatedStem {
+  string name = 1;  // stem 名称（如 vocals、drums）
+  string path = 2;  // 对应输出文件的绝对路径
+}
+
+// 分离音频响应
+message SeparateAudioResponse {
+  bool success = 1;              // 是否成功
+  string vocals_path = 2;        // 人声文件路径（兼容字段）
+  string accompaniment_path = 3; // 背景音文件路径（兼容字段）
+  string error_message = 4;      // 错误信息（如果失败）
+  int32 processing_time_ms = 5;  // 处理耗时（毫秒）
+  repeated SeparatedStem stems = 6; // 全量 stems 输出列表
+}

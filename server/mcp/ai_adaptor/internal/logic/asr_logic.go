@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"log"
 
-	"video-in-chinese/ai_adaptor/internal/adapters"
-	"video-in-chinese/ai_adaptor/internal/config"
-	pb "video-in-chinese/ai_adaptor/proto"
+	"video-in-chinese/server/mcp/ai_adaptor/internal/adapters"
+	"video-in-chinese/server/mcp/ai_adaptor/internal/config"
+	pb "video-in-chinese/server/mcp/ai_adaptor/proto"
 )
 
 // ASRLogic coordinates automatic speech recognition flows by loading runtime

@@ -11,8 +11,8 @@ import (
 	"os"
 	"time"
 
-	"video-in-chinese/ai_adaptor/internal/utils"
-	pb "video-in-chinese/ai_adaptor/proto"
+	"video-in-chinese/server/mcp/ai_adaptor/internal/utils"
+	pb "video-in-chinese/server/mcp/ai_adaptor/proto"
 )
 
 // GoogleASRAdapter 封装 Google Speech-to-Text API 的批量识别能力，实现 ASRAdapter 接口。

@@ -4,14 +4,14 @@ import (
 	"context"
 	"testing"
 
-	"video-in-chinese/ai_adaptor/internal/adapters"
-	"video-in-chinese/ai_adaptor/internal/adapters/asr"
-	"video-in-chinese/ai_adaptor/internal/adapters/llm"
-	"video-in-chinese/ai_adaptor/internal/adapters/translation"
-	"video-in-chinese/ai_adaptor/internal/adapters/voice_cloning"
-	"video-in-chinese/ai_adaptor/internal/logic"
-	"video-in-chinese/ai_adaptor/internal/voice_cache"
-	pb "video-in-chinese/ai_adaptor/proto"
+	"video-in-chinese/server/mcp/ai_adaptor/internal/adapters"
+	"video-in-chinese/server/mcp/ai_adaptor/internal/adapters/asr"
+	"video-in-chinese/server/mcp/ai_adaptor/internal/adapters/llm"
+	"video-in-chinese/server/mcp/ai_adaptor/internal/adapters/translation"
+	"video-in-chinese/server/mcp/ai_adaptor/internal/adapters/voice_cloning"
+	"video-in-chinese/server/mcp/ai_adaptor/internal/logic"
+	"video-in-chinese/server/mcp/ai_adaptor/internal/voice_cache"
+	pb "video-in-chinese/server/mcp/ai_adaptor/proto"
 )
 
 // TestASRLogicStructure 测试 ASR 服务逻辑结构

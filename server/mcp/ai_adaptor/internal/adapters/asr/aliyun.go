@@ -10,8 +10,8 @@ import (
 	"os"
 	"time"
 
-	"video-in-chinese/ai_adaptor/internal/utils"
-	pb "video-in-chinese/ai_adaptor/proto"
+	"video-in-chinese/server/mcp/ai_adaptor/internal/utils"
+	pb "video-in-chinese/server/mcp/ai_adaptor/proto"
 )
 
 // AliyunASRAdapter 封装阿里云智能语音交互 API 的调用，实现 ASRAdapter 接口。

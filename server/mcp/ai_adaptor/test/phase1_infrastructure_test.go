@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"video-in-chinese/ai_adaptor/internal/adapters"
-	"video-in-chinese/ai_adaptor/internal/config"
-	pb "video-in-chinese/ai_adaptor/proto"
+	"video-in-chinese/server/mcp/ai_adaptor/internal/adapters"
+	"video-in-chinese/server/mcp/ai_adaptor/internal/config"
+	pb "video-in-chinese/server/mcp/ai_adaptor/proto"
 )
 
 // MockASRAdapter 模拟 ASR 适配器

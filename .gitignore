@@ -22,3 +22,9 @@ server/.venv/
 *.exe
 server/mcp/ai_adaptor/ai_adaptor.exe
 .augment/rules/settings.json
+.serena/memories/project_overview.md
+.serena/memories/style_conventions.md
+.serena/memories/suggested_commands.md
+.serena/memories/task_completion.md
+.serena/memories/gozero_best_practices.md
+.serena/memories/task_service_gozero_refactoring.md

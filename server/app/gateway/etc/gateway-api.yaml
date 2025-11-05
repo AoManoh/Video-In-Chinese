@@ -1,0 +1,33 @@
+Name: gateway-api
+Host: 0.0.0.0
+Port: 8080
+
+# Redis configuration
+Redis:
+  Host: 127.0.0.1:6379
+  Type: node
+  Pass: ""
+
+# Task service gRPC configuration
+TaskRpcConf:
+  Endpoints:
+    - 127.0.0.1:50050
+
+# File storage configuration
+TempStoragePath: ./data/temp
+LocalStoragePath: ./data/videos
+
+# Upload configuration
+MaxUploadSizeMB: 2048
+SupportedMimeTypes:
+  - video/mp4
+  - video/quicktime
+  - video/x-matroska
+  - video/x-msvideo
+
+# API Key encryption configuration
+ApiKeyEncryptionSecret: "change-this-to-32-byte-secret!!"
+
+# HTTP configuration
+HttpTimeoutSeconds: 300
+MaxConcurrentConnections: 100

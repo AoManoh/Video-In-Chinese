@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"video-in-chinese/ai_adaptor/internal/config"
+	"video-in-chinese/server/mcp/ai_adaptor/internal/config"
 )
 
 // TestConfigManager_ParseConfig_NewFields 测试新字段解析

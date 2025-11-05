@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"video-in-chinese/ai_adaptor/internal/config"
+	"video-in-chinese/server/mcp/ai_adaptor/internal/config"
 )
 
 // TestConfigManagerCaching 测试配置缓存功能

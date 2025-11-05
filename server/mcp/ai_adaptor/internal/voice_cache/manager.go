@@ -14,8 +14,8 @@ import (
 	"sync"
 	"time"
 
-	"video-in-chinese/ai_adaptor/internal/config"
-	"video-in-chinese/ai_adaptor/internal/utils"
+	"video-in-chinese/server/mcp/ai_adaptor/internal/config"
+	"video-in-chinese/server/mcp/ai_adaptor/internal/utils"
 )
 
 // VoiceInfo 表示已注册的语音资源元数据，用于在内存与 Redis 间同步缓存状态。

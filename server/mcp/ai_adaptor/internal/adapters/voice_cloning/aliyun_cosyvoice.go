@@ -13,8 +13,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"video-in-chinese/ai_adaptor/internal/utils"
-	"video-in-chinese/ai_adaptor/internal/voice_cache"
+	"video-in-chinese/server/mcp/ai_adaptor/internal/utils"
+	"video-in-chinese/server/mcp/ai_adaptor/internal/voice_cache"
 )
 
 // AliyunCosyVoiceAdapter 封装阿里云 CosyVoice API，实现 VoiceCloningAdapter 接口。

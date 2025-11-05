@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"video-in-chinese/ai_adaptor/internal/utils"
+	"video-in-chinese/server/mcp/ai_adaptor/internal/utils"
 )
 
 // GeminiLLMAdapter 封装 Google Gemini API，实现 LLMAdapter 接口。

@@ -3,7 +3,7 @@ package test
 import (
 	"testing"
 
-	"video-in-chinese/ai_adaptor/internal/utils"
+	"video-in-chinese/server/mcp/ai_adaptor/internal/utils"
 )
 
 // TestGenerateObjectKey 测试对象键生成

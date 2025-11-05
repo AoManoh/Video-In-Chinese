@@ -10,8 +10,8 @@ import (
 	"os"
 	"time"
 
-	"video-in-chinese/ai_adaptor/internal/utils"
-	pb "video-in-chinese/ai_adaptor/proto"
+	"video-in-chinese/server/mcp/ai_adaptor/internal/utils"
+	pb "video-in-chinese/server/mcp/ai_adaptor/proto"
 )
 
 // AzureASRAdapter 封装 Azure Speech Service 的批量转写能力，实现 ASRAdapter 接口。

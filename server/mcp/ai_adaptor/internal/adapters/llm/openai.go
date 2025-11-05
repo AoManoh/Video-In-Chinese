@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"video-in-chinese/ai_adaptor/internal/utils"
+	"video-in-chinese/server/mcp/ai_adaptor/internal/utils"
 )
 
 // OpenAILLMAdapter 封装 OpenAI Chat Completions API，实现 LLMAdapter 接口。

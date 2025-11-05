@@ -1,7 +1,7 @@
 package adapters
 
 import (
-	pb "video-in-chinese/ai_adaptor/proto"
+	pb "video-in-chinese/server/mcp/ai_adaptor/proto"
 )
 
 // ASRAdapter 定义了统一的语音识别适配器抽象，封装各厂商 API 的调用差异并向业务层提供稳定的 gRPC 行为。

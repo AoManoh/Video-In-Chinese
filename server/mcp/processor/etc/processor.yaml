@@ -1,0 +1,39 @@
+Name: processor
+Mode: dev
+
+# Redis 配置
+Redis:
+  Host: 127.0.0.1:6379
+  Type: node
+  Pass: ""
+
+# 本地存储路径
+LocalStoragePath: ./data/videos
+
+# gRPC 客户端配置（GoZero RpcClientConf 格式）
+AIAdaptorRpcConf:
+  Endpoints:
+    - 127.0.0.1:50051
+  Timeout: 300000  # 5 分钟超时（AI 服务可能较慢）
+
+AudioSeparatorRpcConf:
+  Endpoints:
+    - 127.0.0.1:50052
+  Timeout: 300000  # 5 分钟超时（音频分离可能较慢）
+
+# 任务队列配置
+TaskQueueKey: task:pending
+TaskPullIntervalSeconds: 5
+
+# 并发控制
+MaxConcurrency: 3
+
+# ffmpeg 路径（可选，默认使用系统 PATH）
+FfmpegPath: ffmpeg
+
+# 日志配置
+Log:
+  ServiceName: processor
+  Mode: console
+  Level: info
+

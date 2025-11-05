@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"video-in-chinese/ai_adaptor/internal/adapters"
-	"video-in-chinese/ai_adaptor/internal/adapters/asr"
-	"video-in-chinese/ai_adaptor/internal/config"
+	"video-in-chinese/server/mcp/ai_adaptor/internal/adapters"
+	"video-in-chinese/server/mcp/ai_adaptor/internal/adapters/asr"
+	"video-in-chinese/server/mcp/ai_adaptor/internal/config"
 )
 
 func encrypt(value string, cm *config.CryptoManager, t *testing.T) string {

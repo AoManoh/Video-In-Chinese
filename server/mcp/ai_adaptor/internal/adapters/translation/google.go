@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"video-in-chinese/ai_adaptor/internal/utils"
+	"video-in-chinese/server/mcp/ai_adaptor/internal/utils"
 )
 
 // GoogleTranslationAdapter 封装 Google Cloud Translation API 的调用，实现 TranslationAdapter 接口。

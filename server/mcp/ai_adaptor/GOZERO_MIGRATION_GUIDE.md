@@ -171,14 +171,14 @@ mkdir proto
 cp ../ai_adaptor/proto/aiadaptor.proto proto/
 
 # 5. 修改 proto 文件的 go_package 选项
-# 将 option go_package = "video-in-chinese/ai_adaptor/proto";
+# 将 option go_package = "video-in-chinese/server/mcp/ai_adaptor/proto";
 # 改为 option go_package = "./proto";
 
 # 6. 使用 goctl 生成项目
 goctl rpc protoc proto/aiadaptor.proto --go_out=. --go-grpc_out=. --zrpc_out=. --style=goZero
 
 # 7. 初始化 go.mod
-go mod init video-in-chinese/ai_adaptor
+go mod init video-in-chinese/server/mcp/ai_adaptor
 go mod tidy
 
 # 8. 验证编译
@@ -321,9 +321,9 @@ type Config struct {
 package svc
 
 import (
-	"video-in-chinese/ai_adaptor/internal/config"
-	"video-in-chinese/ai_adaptor/internal/storage"
-	"video-in-chinese/ai_adaptor/internal/voice_cache"
+	"video-in-chinese/server/mcp/ai_adaptor/internal/config"
+	"video-in-chinese/server/mcp/ai_adaptor/internal/storage"
+	"video-in-chinese/server/mcp/ai_adaptor/internal/voice_cache"
 	
 	"github.com/zeromicro/go-zero/core/stores/redis"
 )
@@ -713,7 +713,7 @@ go tool cover -func=coverage.out | grep total
 
 **原配置**:
 ```proto
-option go_package = "video-in-chinese/ai_adaptor/proto";
+option go_package = "video-in-chinese/server/mcp/ai_adaptor/proto";
 ```
 
 **修改后**:
@@ -721,7 +721,7 @@ option go_package = "video-in-chinese/ai_adaptor/proto";
 option go_package = "./proto";
 ```
 
-**结果**: 生成的导入路径正确 (`video-in-chinese/ai_adaptor/proto`)
+**结果**: 生成的导入路径正确 (`video-in-chinese/server/mcp/ai_adaptor/proto`)
 
 ### 6.3 并发安全和错误处理的保持
 
