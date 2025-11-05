@@ -10,17 +10,56 @@ import (
 	"os"
 	"time"
 
-	pb "video-in-chinese/ai_adaptor/proto"
 	"video-in-chinese/ai_adaptor/internal/utils"
+	pb "video-in-chinese/ai_adaptor/proto"
 )
 
-// AzureASRAdapter Azure 语音识别适配器
-// 实现 ASRAdapter 接口，调用 Azure Speech Service API
+// AzureASRAdapter 封装 Azure Speech Service 的批量转写能力，实现 ASRAdapter 接口。
+//
+// 功能说明:
+//   - 提交批量转写任务、轮询任务状态并解析最终识别结果。
+//
+// 设计决策:
+//   - 采用带 120 秒超时的 http.Client 以兼容长音频识别。
+//
+// 使用示例:
+//
+//	adapter := NewAzureASRAdapter()
+//	speakers, err := adapter.ASR(audioPath, apiKey, "")
+//
+// 参数说明:
+//   - 不适用: 结构体通过构造函数创建。
+//
+// 返回值说明:
+//   - 不适用: 结构体用于维护客户端实例。
+//
+// 错误处理说明:
+//   - 具体错误由 ASR 方法返回。
+//
+// 注意事项:
+//   - 调用前需准备 Azure Speech Service 的订阅密钥与端点。
 type AzureASRAdapter struct {
 	client *http.Client
 }
 
-// NewAzureASRAdapter 创建新的 Azure ASR 适配器
+// NewAzureASRAdapter 创建 Azure ASR 适配器实例并初始化 HTTP 客户端。
+//
+// 功能说明:
+//   - 提供默认超时配置的适配器供业务层直接调用。
+//
+// 设计决策:
+//   - 将 http.Client 封装在结构体中，便于后续注入自定义 Transport。
+//
+// 使用示例:
+//
+//	adapter := NewAzureASRAdapter()
+//
+// 返回值说明:
+//
+//	*AzureASRAdapter: 已初始化的适配器实例。
+//
+// 注意事项:
+//   - 若需自定义超时，可在返回值上替换 client。
 func NewAzureASRAdapter() *AzureASRAdapter {
 	return &AzureASRAdapter{
 		client: &http.Client{
@@ -29,85 +68,133 @@ func NewAzureASRAdapter() *AzureASRAdapter {
 	}
 }
 
-// AzureASRRequest Azure Speech API 请求结构（Batch Transcription）
+// AzureASRRequest 描述 Azure Speech Service 批量转写接口的请求体。
+//
+// 功能说明:
+//   - 指定音频来源、语种配置及说话人分离选项。
+//
+// 设计决策:
+//   - 使用显式字段映射，便于 JSON 序列化与调试。
+//
+// 注意事项:
+//   - ContentURLs 中的音频需对 Azure 可访问。
 type AzureASRRequest struct {
-	ContentURLs        []string          `json:"contentUrls"`        // 音频文件 URL 列表
-	Locale             string            `json:"locale"`             // 语言区域（如 "en-US", "zh-CN"）
-	DisplayName        string            `json:"displayName"`        // 转录任务显示名称
+	ContentURLs        []string           `json:"contentUrls"`        // 音频文件 URL 列表
+	Locale             string             `json:"locale"`             // 语言区域（如 "en-US", "zh-CN"）
+	DisplayName        string             `json:"displayName"`        // 转录任务显示名称
 	Properties         AzureASRProperties `json:"properties"`         // 转录属性
-	DiarizationEnabled bool              `json:"diarizationEnabled"` // 是否启用说话人分离
+	DiarizationEnabled bool               `json:"diarizationEnabled"` // 是否启用说话人分离
 }
 
-// AzureASRProperties Azure Speech API 转录属性
+// AzureASRProperties 控制 Azure 批量转写任务的高级属性（标点、敏感词过滤、时间戳）。
+//
+// 功能说明:
+//   - 配置标点模式、敏感词过滤与单词级时间戳。
+//
+// 注意事项:
+//   - WordLevelTimestampsEnabled 会影响输出体积与费用。
 type AzureASRProperties struct {
-	PunctuationMode        string `json:"punctuationMode"`        // 标点符号模式（"DictatedAndAutomatic"）
-	ProfanityFilterMode    string `json:"profanityFilterMode"`    // 脏话过滤模式（"None"）
-	WordLevelTimestampsEnabled bool `json:"wordLevelTimestampsEnabled"` // 是否启用词级别时间戳
+	PunctuationMode            string `json:"punctuationMode"`            // 标点符号模式（"DictatedAndAutomatic"）
+	ProfanityFilterMode        string `json:"profanityFilterMode"`        // 脏话过滤模式（"None"）
+	WordLevelTimestampsEnabled bool   `json:"wordLevelTimestampsEnabled"` // 是否启用词级别时间戳
 }
 
-// AzureASRResponse Azure Speech API 响应结构（Batch Transcription）
+// AzureASRResponse 表示批量转写任务的创建与状态响应。
+//
+// 功能说明:
+//   - 提供任务状态、自引用链接与结果文件索引。
+//
+// 注意事项:
+//   - Status 可能取 NotStarted、Running、Succeeded、Failed 等值。
 type AzureASRResponse struct {
-	Self              string                 `json:"self"`              // 转录任务 URL
-	Status            string                 `json:"status"`            // 任务状态（"NotStarted", "Running", "Succeeded", "Failed"）
-	CreatedDateTime   string                 `json:"createdDateTime"`   // 创建时间
-	LastActionDateTime string                `json:"lastActionDateTime"` // 最后操作时间
-	Links             AzureASRLinks          `json:"links"`             // 相关链接
+	Self               string        `json:"self"`               // 转录任务 URL
+	Status             string        `json:"status"`             // 任务状态（"NotStarted", "Running", "Succeeded", "Failed"）
+	CreatedDateTime    string        `json:"createdDateTime"`    // 创建时间
+	LastActionDateTime string        `json:"lastActionDateTime"` // 最后操作时间
+	Links              AzureASRLinks `json:"links"`              // 相关链接
 }
 
-// AzureASRLinks Azure Speech API 链接结构
+// AzureASRLinks 提供批量转写任务相关的资源链接（如结果文件列表）。
 type AzureASRLinks struct {
 	Files string `json:"files"` // 结果文件列表 URL
 }
 
-// AzureASRFilesResponse Azure Speech API 文件列表响应
+// AzureASRFilesResponse 表示结果文件 API 的响应，包含多个文件条目。
 type AzureASRFilesResponse struct {
 	Values []AzureASRFile `json:"values"` // 文件列表
 }
 
-// AzureASRFile Azure Speech API 文件结构
+// AzureASRFile 描述批量转写结果中的单个文件条目（类型、名称与下载地址）。
 type AzureASRFile struct {
-	Kind        string `json:"kind"`        // 文件类型（"Transcription"）
-	Name        string `json:"name"`        // 文件名
-	ContentURL  string `json:"contentUrl"`  // 文件下载 URL
+	Kind       string `json:"kind"`       // 文件类型（"Transcription"）
+	Name       string `json:"name"`       // 文件名
+	ContentURL string `json:"contentUrl"` // 文件下载 URL
 }
 
-// AzureTranscriptionResult Azure Speech API 转录结果
+// AzureTranscriptionResult 表示批量转写完成后的聚合结果。
+//
+// 功能说明:
+//   - CombinedRecognizedPhrases 提供整体摘要。
+//   - RecognizedPhrases 提供逐句明细及说话人信息。
 type AzureTranscriptionResult struct {
-	CombinedRecognizedPhrases []AzureCombinedPhrase `json:"combinedRecognizedPhrases"` // 合并的识别短语
-	RecognizedPhrases         []AzureRecognizedPhrase `json:"recognizedPhrases"`       // 识别的短语列表
+	CombinedRecognizedPhrases []AzureCombinedPhrase   `json:"combinedRecognizedPhrases"` // 合并的识别短语
+	RecognizedPhrases         []AzureRecognizedPhrase `json:"recognizedPhrases"`         // 识别的短语列表
 }
 
-// AzureCombinedPhrase Azure 合并短语
+// AzureCombinedPhrase 表示聚合后的整段识别内容，包含声道与显示文本。
 type AzureCombinedPhrase struct {
 	Channel int    `json:"channel"` // 音频通道
 	Lexical string `json:"lexical"` // 词汇形式
 	Display string `json:"display"` // 显示形式
 }
 
-// AzureRecognizedPhrase Azure 识别短语
+// AzureRecognizedPhrase 表示单条识别结果，包含时间戳、说话人及候选列表。
 type AzureRecognizedPhrase struct {
-	Channel        int                `json:"channel"`        // 音频通道
-	OffsetInTicks  int64              `json:"offsetInTicks"`  // 开始时间（100 纳秒为单位）
-	DurationInTicks int64             `json:"durationInTicks"` // 持续时间（100 纳秒为单位）
-	NBest          []AzureNBestResult `json:"nBest"`          // N-Best 结果列表
-	Speaker        int                `json:"speaker"`        // 说话人 ID（如果启用了说话人分离）
+	Channel         int                `json:"channel"`         // 音频通道
+	OffsetInTicks   int64              `json:"offsetInTicks"`   // 开始时间（100 纳秒为单位）
+	DurationInTicks int64              `json:"durationInTicks"` // 持续时间（100 纳秒为单位）
+	NBest           []AzureNBestResult `json:"nBest"`           // N-Best 结果列表
+	Speaker         int                `json:"speaker"`         // 说话人 ID（如果启用了说话人分离）
 }
 
-// AzureNBestResult Azure N-Best 结果
+// AzureNBestResult 描述单条识别结果的候选列表，包含置信度与不同展示形式。
 type AzureNBestResult struct {
 	Confidence float64 `json:"confidence"` // 置信度
 	Lexical    string  `json:"lexical"`    // 词汇形式
 	Display    string  `json:"display"`    // 显示形式
 }
 
-// ASR 执行语音识别，返回说话人列表
-// 参数:
-//   - audioPath: 音频文件的本地路径
-//   - apiKey: 解密后的 API 密钥（Azure Speech Service 订阅密钥）
-//   - endpoint: 自定义端点 URL（为空则使用默认端点）
-// 返回:
-//   - speakers: 说话人列表，包含句子级时间戳和文本
-//   - error: 错误信息（401: API密钥无效, 429: API配额不足, 5xx: 外部API服务错误）
+// ASR 执行一次离线语音识别，并以说话人列表形式返回结果。
+//
+// 功能说明:
+//   - 上传音频至 Azure Blob（或可访问 URL），创建批量转写任务并解析结果。
+//
+// 设计决策:
+//   - 默认启用说话人分离与标点，便于后续字幕生成。
+//   - 内置重试与轮询策略，缓解瞬时网络问题与异步任务延迟。
+//
+// 使用示例:
+//
+//	speakers, err := adapter.ASR("./input.wav", apiKey, "")
+//
+// 参数说明:
+//
+//	audioPath string: 本地音频文件路径。
+//	apiKey string: Azure Speech Service 订阅密钥（需提前解密）。
+//	endpoint string: 自定义端点 URL，空字符串使用默认地区端点。
+//
+// 返回值说明:
+//
+//	[]*pb.Speaker: 识别结果，按说话人聚合并包含句子时间戳。
+//	error: 上传、网络或识别失败时返回。
+//
+// 错误处理说明:
+//   - HTTP 401/403 映射为密钥无效，429 表示限流，5xx 表示供应商故障。
+//   - JSON 解析失败会在错误中附带响应体，便于排查。
+//
+// 注意事项:
+//   - 调用前需确保音频已上传至可访问的存储，或提供公开 URL。
+//   - 长音频识别耗时较久，建议调用方设置上下文超时。
 func (a *AzureASRAdapter) ASR(audioPath, apiKey, endpoint string) ([]*pb.Speaker, error) {
 	log.Printf("[AzureASRAdapter] Starting ASR: audio_path=%s", audioPath)
 
@@ -158,7 +245,27 @@ func (a *AzureASRAdapter) ASR(audioPath, apiKey, endpoint string) ([]*pb.Speaker
 	return speakers, nil
 }
 
-// createTranscription 创建批量转录任务
+// createTranscription 创建批量转录任务并返回任务查询 URL。
+//
+// 功能说明:
+//   - 构造请求体、发送创建请求并处理重试逻辑。
+//
+// 设计决策:
+//   - 将重试集中于此函数，以便统一处理限流与瞬时错误。
+//
+// 参数说明:
+//
+//	endpoint string: Azure 转写 API 端点。
+//	audioURL string: 可访问的音频文件 URL。
+//	apiKey string: Azure Speech Service 订阅密钥。
+//
+// 返回值说明:
+//
+//	string: 创建成功后返回的任务自服务链接。
+//	error: 请求失败或重试耗尽时返回。
+//
+// 注意事项:
+//   - 非可重试错误（401、429）会立刻返回，避免无谓重试。
 func (a *AzureASRAdapter) createTranscription(endpoint, audioURL, apiKey string) (string, error) {
 	// 构建请求体
 	requestBody := AzureASRRequest{
@@ -207,7 +314,24 @@ func (a *AzureASRAdapter) createTranscription(endpoint, audioURL, apiKey string)
 	return response.Self, nil
 }
 
-// sendCreateTranscriptionRequest 发送创建转录任务的 HTTP 请求
+// sendCreateTranscriptionRequest 向 Azure 转写接口发送创建请求并解析响应。
+//
+// 功能说明:
+//   - 构造 HTTP 请求、校验状态码并将响应解码为 AzureASRResponse。
+//
+// 参数说明:
+//
+//	endpoint string: API 端点。
+//	requestJSON []byte: 序列化后的请求体。
+//	apiKey string: Azure Speech Service 订阅密钥。
+//
+// 返回值说明:
+//
+//	*AzureASRResponse: 成功创建任务后的响应。
+//	error: HTTP 失败或解码失败时返回。
+//
+// 注意事项:
+//   - 201 状态码表示创建成功，其他状态码会被映射为错误并包含响应体。
 func (a *AzureASRAdapter) sendCreateTranscriptionRequest(endpoint string, requestJSON []byte, apiKey string) (*AzureASRResponse, error) {
 	// 创建 HTTP 请求
 	req, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(requestJSON))
@@ -255,7 +379,23 @@ func (a *AzureASRAdapter) sendCreateTranscriptionRequest(endpoint string, reques
 	return &asrResponse, nil
 }
 
-// pollTranscriptionStatus 轮询转录任务状态，等待完成
+// pollTranscriptionStatus 轮询批量转写任务状态，直至成功、失败或超时。
+//
+// 功能说明:
+//   - 定期向任务链接发起 GET 请求，解析状态并在成功时返回结果文件链接。
+//
+// 参数说明:
+//
+//	transcriptionURL string: 创建任务时返回的自服务链接。
+//	apiKey string: Azure Speech Service 订阅密钥。
+//
+// 返回值说明:
+//
+//	string: 成功时返回结果文件列表链接。
+//	error: 任务失败或轮询超时时返回错误。
+//
+// 注意事项:
+//   - 轮询总时长受 maxPollingTime 限制，默认 5 分钟。
 func (a *AzureASRAdapter) pollTranscriptionStatus(transcriptionURL, apiKey string) (string, error) {
 	log.Printf("[AzureASRAdapter] Polling transcription status: %s", transcriptionURL)
 
@@ -310,17 +450,28 @@ func (a *AzureASRAdapter) pollTranscriptionStatus(transcriptionURL, apiKey strin
 	}
 }
 
-// getTranscriptionResult 获取转录结果文件
+// getTranscriptionResult 获取批量转写结果文件并解析为结构化结果。
+//
+// 功能说明:
+//   - 预留实现：未来将下载 JSON 结果并反序列化为 AzureTranscriptionResult。
+//
+// 注意事项:
+//   - Phase 4 后续迭代将补全实现，当前返回占位错误。
 func (a *AzureASRAdapter) getTranscriptionResult(filesURL, apiKey string) (*AzureTranscriptionResult, error) {
 	// TODO: 实现获取转录结果文件的完整逻辑（Phase 4 后期实现）
 	// 临时占位符：返回空结果
 	return &AzureTranscriptionResult{}, fmt.Errorf("获取转录结果功能尚未实现（Phase 4 后期实现）")
 }
 
-// parseTranscriptionResult 解析转录结果，转换为 Speaker 列表
+// parseTranscriptionResult 将批量转写结果解析为 pb.Speaker 列表。
+//
+// 功能说明:
+//   - 预留实现：未来会根据 RecognizedPhrases 构建说话人结构。
+//
+// 注意事项:
+//   - Phase 4 后续迭代将补全实现，当前返回占位错误。
 func (a *AzureASRAdapter) parseTranscriptionResult(result *AzureTranscriptionResult) ([]*pb.Speaker, error) {
 	// TODO: 实现解析转录结果的完整逻辑（Phase 4 后期实现）
 	// 临时占位符：返回空列表
 	return []*pb.Speaker{}, fmt.Errorf("解析转录结果功能尚未实现（Phase 4 后期实现）")
 }
-

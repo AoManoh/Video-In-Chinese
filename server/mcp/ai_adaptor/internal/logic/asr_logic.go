@@ -10,13 +10,18 @@ import (
 	pb "video-in-chinese/ai_adaptor/proto"
 )
 
-// ASRLogic ASR 服务逻辑
+// ASRLogic coordinates automatic speech recognition flows by loading runtime
+// settings from ConfigManager, resolving adapters via AdapterRegistry, and
+// delegating execution to the provider implementation. It stays stateless so
+// caching and retry policies remain inside lower layers.
 type ASRLogic struct {
 	registry      *adapters.AdapterRegistry
 	configManager *config.ConfigManager
 }
 
-// NewASRLogic 创建新的 ASR 服务逻辑实例
+// NewASRLogic builds an ASRLogic bound to the shared adapter registry and
+// configuration manager. Callers should reuse the returned instance so the
+// Redis-backed ConfigManager cache remains hot across requests.
 func NewASRLogic(registry *adapters.AdapterRegistry, configManager *config.ConfigManager) *ASRLogic {
 	return &ASRLogic{
 		registry:      registry,
@@ -24,12 +29,38 @@ func NewASRLogic(registry *adapters.AdapterRegistry, configManager *config.Confi
 	}
 }
 
-// ProcessASR 处理 ASR 请求
-// 步骤：
-//  1. 从 Redis 读取 ASR 适配器配置（使用 ConfigManager）
-//  2. 从适配器注册表获取对应的 ASR 适配器实例
-//  3. 调用适配器的 ASR 方法执行语音识别
-//  4. 处理错误并返回说话人列表
+// ProcessASR handles an automatic speech recognition request end to end.
+//
+// Workflow:
+//  1. Validate the protobuf payload to ensure an audio path is provided.
+//  2. Load ASR provider credentials from the Redis-backed ConfigManager cache.
+//  3. Resolve the concrete adapter from AdapterRegistry based on configuration.
+//  4. Invoke the adapter's ASR method and translate results into protobuf
+//     speakers.
+//
+// Parameters:
+//   - ctx: Propagates cancellation and deadline signals to the adapter call.
+//   - req: Incoming gRPC request containing the audio asset that must be
+//     transcribed.
+//
+// Returns:
+//   - *pb.ASRResponse with the detected speakers when transcription succeeds.
+//   - error describing validation errors, configuration lookup failures,
+//     missing adapters, or provider execution issues.
+//
+// Design considerations:
+//   - The logic layer is intentionally stateless; caching and throttling live in
+//     ConfigManager and adapter implementations to keep business rules testable.
+//   - Errors are wrapped with fmt.Errorf so transport layers retain root causes
+//     while exposing localized messages to clients.
+//
+// Example:
+//
+//	res, err := l.ProcessASR(ctx, &pb.ASRRequest{AudioPath: "/tmp/demo.wav"})
+//	if err != nil {
+//		return err
+//	}
+//	log.Printf("detected speakers: %d", len(res.Speakers))
 func (l *ASRLogic) ProcessASR(ctx context.Context, req *pb.ASRRequest) (*pb.ASRResponse, error) {
 	log.Printf("[ASRLogic] Processing ASR request: audio_path=%s", req.AudioPath)
 
@@ -75,4 +106,3 @@ func (l *ASRLogic) ProcessASR(ctx context.Context, req *pb.ASRRequest) (*pb.ASRR
 		Speakers: speakers,
 	}, nil
 }
-

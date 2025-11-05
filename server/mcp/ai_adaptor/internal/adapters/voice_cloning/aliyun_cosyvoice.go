@@ -17,15 +17,53 @@ import (
 	"video-in-chinese/ai_adaptor/internal/voice_cache"
 )
 
-// AliyunCosyVoiceAdapter 阿里云 CosyVoice 声音克隆适配器
-// 实现 VoiceCloningAdapter 接口，调用阿里云 CosyVoice API
-// 集成 VoiceManager 实现音色注册、缓存、轮询
+// AliyunCosyVoiceAdapter 封装阿里云 CosyVoice API，实现 VoiceCloningAdapter 接口。
+//
+// 功能说明:
+//   - 管理音色的注册、缓存命中与语音合成，配合 VoiceManager 降低重复调用。
+//
+// 设计决策:
+//   - 采用 VoiceManager 管理音色缓存，网络细节由适配器集中处理。
+//
+// 使用示例:
+//
+//	adapter := NewAliyunCosyVoiceAdapter(voiceManager)
+//	audioPath, err := adapter.CloneVoice("speaker-1", script, refAudio, apiKey, "")
+//
+// 参数说明:
+//   - 不适用: 结构体实例通过构造函数创建。
+//
+// 返回值说明:
+//   - 不适用: 结构体用于组合 HTTP 客户端与 VoiceManager。
+//
+// 错误处理说明:
+//   - CloneVoice 会根据 HTTP 状态码和业务结果返回具备上下文的错误。
+//
+// 注意事项:
+//   - 需确保 VoiceManager 已正确初始化并具备 Redis 配置。
 type AliyunCosyVoiceAdapter struct {
 	client       *http.Client
 	voiceManager *voice_cache.VoiceManager
 }
 
-// NewAliyunCosyVoiceAdapter 创建新的阿里云 CosyVoice 适配器
+// NewAliyunCosyVoiceAdapter 创建 CosyVoice 适配器实例并注入 VoiceManager。
+//
+// 功能说明:
+//   - 提供默认超时配置的 HTTP 客户端，并保存 VoiceManager 引用。
+//
+// 设计决策:
+//   - VoiceManager 负责音色缓存，适配器专注于外部 API 调用。
+//
+// 使用示例:
+//
+//	adapter := NewAliyunCosyVoiceAdapter(voiceManager)
+//
+// 返回值说明:
+//
+//	*AliyunCosyVoiceAdapter: 已初始化的适配器实例。
+//
+// 注意事项:
+//   - VoiceManager 不能为空，否则无法执行音色注册流程。
 func NewAliyunCosyVoiceAdapter(voiceManager *voice_cache.VoiceManager) *AliyunCosyVoiceAdapter {
 	return &AliyunCosyVoiceAdapter{
 		client: &http.Client{
@@ -49,19 +87,36 @@ type AliyunSynthesizeResponse struct {
 	AudioData  string `json:"audio_data"`  // Base64 编码的音频数据
 }
 
-// CloneVoice 执行声音克隆
-// 参数:
-//   - speakerID: 说话人 ID（用于缓存）
-//   - text: 要合成的文本
-//   - referenceAudio: 参考音频路径
-//   - apiKey: 解密后的 API 密钥
-//   - endpoint: 自定义端点 URL（为空则使用默认端点）
+// CloneVoice 执行声音克隆并返回合成后的音频文件路径。
 //
-// 返回:
-//   - audioPath: 合成的音频路径
-//   - error: 错误信息（401: API密钥无效, 429: API配额不足, 404: 音色不存在, 408: 音色注册超时, 5xx: 外部API服务错误）
+// 功能说明:
+//   - 通过 VoiceManager 获取或注册音色后调用 CosyVoice 合成音频，失败时自动处理缓存失效。
 //
-// 注意: 音色管理逻辑（缓存检查、音色注册、轮询）由 VoiceManager 实现
+// 设计决策:
+//   - 将音色注册与缓存逻辑下沉至 VoiceManager，适配器负责 API 调用与失败重试。
+//
+// 使用示例:
+//
+//	audioPath, err := adapter.CloneVoice("speaker-1", text, refAudio, apiKey, endpoint)
+//
+// 参数说明:
+//
+//	speakerID string: 说话人标识，用于缓存键。
+//	text string: 要合成的文本。
+//	referenceAudio string: 参考音频路径，用于音色注册。
+//	apiKey string: 阿里云 CosyVoice API 密钥。
+//	endpoint string: 可选自定义端点，留空使用默认。
+//
+// 返回值说明:
+//
+//	string: 生成音频的本地路径。
+//	error: 调用失败或注册音色失败时返回。
+//
+// 错误处理说明:
+//   - 将 401/403、429、404、408、5xx 等错误转换为具上下文的提示，并在音色失效时自动重试注册。
+//
+// 注意事项:
+//   - 需要提前准备参考音频文件，并确保 VoiceManager 有效。
 func (a *AliyunCosyVoiceAdapter) CloneVoice(speakerID, text, referenceAudio, apiKey, endpoint string) (string, error) {
 	log.Printf("[AliyunCosyVoiceAdapter] Starting voice cloning: speaker_id=%s", speakerID)
 
@@ -121,7 +176,25 @@ func (a *AliyunCosyVoiceAdapter) CloneVoice(speakerID, text, referenceAudio, api
 	return audioPath, nil
 }
 
-// synthesizeAudio 调用阿里云 API 合成音频
+// synthesizeAudio 调用阿里云 CosyVoice API 合成音频并返回原始字节。
+//
+// 功能说明:
+//   - 构造合成请求、执行带重试的调用，并解析 Base64 音频数据。
+//
+// 参数说明:
+//
+//	voiceID string: 已注册的音色 ID。
+//	text string: 待合成文本。
+//	apiKey string: 阿里云 CosyVoice API 密钥。
+//	endpoint string: 可选自定义端点。
+//
+// 返回值说明:
+//
+//	[]byte: 解码后的音频数据。
+//	error: 请求失败或解码失败时返回。
+//
+// 注意事项:
+//   - 对 401/429/404 等不可重试错误立即返回，其余错误按策略重试。
 func (a *AliyunCosyVoiceAdapter) synthesizeAudio(voiceID, text, apiKey, endpoint string) ([]byte, error) {
 	// 步骤 1: 构建请求体
 	requestBody := AliyunSynthesizeRequest{
@@ -181,7 +254,24 @@ func (a *AliyunCosyVoiceAdapter) synthesizeAudio(voiceID, text, apiKey, endpoint
 	return audioData, nil
 }
 
-// sendSynthesizeRequest 发送音频合成 HTTP 请求
+// sendSynthesizeRequest 发送音频合成 HTTP 请求并解析响应。
+//
+// 功能说明:
+//   - 设置认证头，校验 HTTP 状态码并解码为 AliyunSynthesizeResponse。
+//
+// 参数说明:
+//
+//	endpoint string: CosyVoice API URL。
+//	requestJSON []byte: 序列化后的请求体。
+//	apiKey string: 阿里云 CosyVoice API 密钥。
+//
+// 返回值说明:
+//
+//	*AliyunSynthesizeResponse: 成功时返回的响应结构。
+//	error: 网络错误、状态码异常或 JSON 解析失败时返回。
+//
+// 注意事项:
+//   - 针对 401/403、429、404、5xx 等情况提供清晰的错误信息。
 func (a *AliyunCosyVoiceAdapter) sendSynthesizeRequest(endpoint string, requestJSON []byte, apiKey string) (*AliyunSynthesizeResponse, error) {
 	// 创建 HTTP 请求
 	req, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(requestJSON))
@@ -237,7 +327,23 @@ func (a *AliyunCosyVoiceAdapter) sendSynthesizeRequest(endpoint string, requestJ
 	return &synthesizeResponse, nil
 }
 
-// saveAudioFile 保存音频文件到本地
+// saveAudioFile 将合成的音频数据写入本地文件并返回路径。
+//
+// 功能说明:
+//   - 根据 speakerID 生成文件名，写入输出目录并返回路径。
+//
+// 参数说明:
+//
+//	audioData []byte: 待写入的音频数据。
+//	speakerID string: 用于拼接文件名的说话人标识。
+//
+// 返回值说明:
+//
+//	string: 保存后的音频文件路径。
+//	error: 创建目录或写入文件失败时返回。
+//
+// 注意事项:
+//   - 输出目录可通过环境变量 CLONED_VOICE_OUTPUT_DIR 配置。
 func (a *AliyunCosyVoiceAdapter) saveAudioFile(audioData []byte, speakerID string) (string, error) {
 	// 步骤 1: 创建输出目录
 	// 从环境变量读取输出目录，如果未设置则使用默认值

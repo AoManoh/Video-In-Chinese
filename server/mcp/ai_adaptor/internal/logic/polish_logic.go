@@ -10,13 +10,16 @@ import (
 	pb "video-in-chinese/ai_adaptor/proto"
 )
 
-// PolishLogic 文本润色服务逻辑
+// PolishLogic encapsulates text polishing flows backed by large language model
+// adapters. It coordinates configuration toggles, provider selection, and error
+// reporting for the polish endpoint.
 type PolishLogic struct {
 	registry      *adapters.AdapterRegistry
 	configManager *config.ConfigManager
 }
 
-// NewPolishLogic 创建新的文本润色服务逻辑实例
+// NewPolishLogic constructs a PolishLogic instance bound to the shared adapter
+// registry and configuration manager.
 func NewPolishLogic(registry *adapters.AdapterRegistry, configManager *config.ConfigManager) *PolishLogic {
 	return &PolishLogic{
 		registry:      registry,
@@ -24,13 +27,38 @@ func NewPolishLogic(registry *adapters.AdapterRegistry, configManager *config.Co
 	}
 }
 
-// ProcessPolish 处理文本润色请求
-// 步骤：
-//  1. 从 Redis 读取 LLM 适配器配置（使用 ConfigManager）
-//  2. 检查文本润色是否启用
-//  3. 从适配器注册表获取对应的 LLM 适配器实例
-//  4. 调用适配器的 Polish 方法执行文本润色
-//  5. 处理错误并返回润色结果
+// ProcessPolish runs the polishing pipeline for a block of text using the LLM
+// provider defined in configuration.
+//
+// Workflow:
+//  1. Validate the request payload.
+//  2. Fetch configuration and feature toggles from ConfigManager.
+//  3. Short-circuit when polishing is disabled, returning the original text.
+//  4. Resolve the LLM adapter and invoke its Polish implementation with the
+//     configured video type and optional custom prompt.
+//
+// Parameters:
+//   - ctx: Propagates cancellation and timeouts to downstream components.
+//   - req: gRPC payload describing the original text to polish.
+//
+// Returns:
+//   - *pb.PolishResponse carrying the polished text on success.
+//   - error describing validation, configuration, registry, or adapter
+//     failures.
+//
+// Design considerations:
+//   - Toggle checks allow operators to disable polishing without code changes
+//     while keeping observability logs consistent.
+//   - Custom prompts are optional; when omitted, defaults keep provider prompts
+//     stable across tenants.
+//
+// Example:
+//
+//	res, err := l.ProcessPolish(ctx, &pb.PolishRequest{Text: "raw caption"})
+//	if err != nil {
+//		return err
+//	}
+//	log.Println(res.PolishedText)
 func (l *PolishLogic) ProcessPolish(ctx context.Context, req *pb.PolishRequest) (*pb.PolishResponse, error) {
 	log.Printf("[PolishLogic] Processing polish request: text_length=%d", len(req.Text))
 
@@ -98,4 +126,3 @@ func (l *PolishLogic) ProcessPolish(ctx context.Context, req *pb.PolishRequest) 
 		PolishedText: polishedText,
 	}, nil
 }
-

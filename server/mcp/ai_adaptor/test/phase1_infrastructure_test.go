@@ -195,26 +195,8 @@ func TestCryptoManagerInvalidSecret(t *testing.T) {
 
 // TestRedisClient 测试 Redis 客户端（需要 Redis 运行）
 func TestRedisClient(t *testing.T) {
-	// 跳过测试如果没有 Redis
-	if os.Getenv("SKIP_REDIS_TESTS") == "true" {
-		t.Skip("Skipping Redis tests")
-	}
-
-	// 设置测试环境变量
-	os.Setenv("REDIS_HOST", "localhost")
-	os.Setenv("REDIS_PORT", "6379")
-	os.Setenv("REDIS_DB", "0")
-	defer func() {
-		os.Unsetenv("REDIS_HOST")
-		os.Unsetenv("REDIS_PORT")
-		os.Unsetenv("REDIS_DB")
-	}()
-
-	client, err := config.NewRedisClient()
-	if err != nil {
-		t.Skipf("Skipping test: Redis not available: %v", err)
-	}
-	defer client.Close()
+	// 使用内存 Redis 实例，避免依赖外部环境。
+	client := config.NewMockRedisClient()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -225,8 +207,7 @@ func TestRedisClient(t *testing.T) {
 	createdAt := time.Now().Format(time.RFC3339)
 	referenceAudio := "/tmp/test_audio.wav"
 
-	err = client.SetVoiceCache(ctx, speakerID, voiceID, createdAt, referenceAudio)
-	if err != nil {
+	if err := client.SetVoiceCache(ctx, speakerID, voiceID, createdAt, referenceAudio); err != nil {
 		t.Fatalf("Failed to set voice cache: %v", err)
 	}
 
@@ -244,8 +225,7 @@ func TestRedisClient(t *testing.T) {
 	}
 
 	// 删除音色缓存
-	err = client.DeleteVoiceCache(ctx, speakerID)
-	if err != nil {
+	if err := client.DeleteVoiceCache(ctx, speakerID); err != nil {
 		t.Fatalf("Failed to delete voice cache: %v", err)
 	}
 

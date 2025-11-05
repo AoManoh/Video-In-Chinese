@@ -13,14 +13,52 @@ import (
 	"video-in-chinese/ai_adaptor/internal/utils"
 )
 
-// OpenAILLMAdapter OpenAI 格式 LLM 适配器
-// 实现 LLMAdapter 接口，调用 OpenAI Chat Completions API
-// 支持自定义 endpoint，兼容第三方中转服务（如 gemini-balance、one-api、new-api 等）
+// OpenAILLMAdapter 封装 OpenAI Chat Completions API，实现 LLMAdapter 接口。
+//
+// 功能说明:
+//   - 提供文本润色与脚本优化的统一入口，支持自定义 endpoint 与第三方中转服务。
+//
+// 设计决策:
+//   - 使用 120 秒超时的 http.Client，以适配长输入和复杂生成任务。
+//
+// 使用示例:
+//
+//	adapter := NewOpenAILLMAdapter()
+//	polished, err := adapter.Polish(text, "professional_tech", "", apiKey, "")
+//
+// 参数说明:
+//   - 不适用: 结构体实例通过构造函数创建。
+//
+// 返回值说明:
+//   - 不适用: 结构体用于持有 HTTP 客户端。
+//
+// 错误处理说明:
+//   - 由 Polish/Optimize 方法根据 HTTP 状态码分类错误。
+//
+// 注意事项:
+//   - endpoint 可指向代理服务（one-api、gemini-balance 等）以满足不同部署需求。
 type OpenAILLMAdapter struct {
 	client *http.Client
 }
 
-// NewOpenAILLMAdapter 创建新的 OpenAI LLM 适配器
+// NewOpenAILLMAdapter 创建 OpenAI LLM 适配器实例并初始化 HTTP 客户端。
+//
+// 功能说明:
+//   - 提供默认超时配置的适配器供业务层直接使用。
+//
+// 设计决策:
+//   - 封装 http.Client，便于后续依赖注入或自定义 Transport。
+//
+// 使用示例:
+//
+//	adapter := NewOpenAILLMAdapter()
+//
+// 返回值说明:
+//
+//	*OpenAILLMAdapter: 已初始化的适配器实例。
+//
+// 注意事项:
+//   - 若需自定义超时，可替换返回值的 client 字段。
 func NewOpenAILLMAdapter() *OpenAILLMAdapter {
 	return &OpenAILLMAdapter{
 		client: &http.Client{
@@ -68,17 +106,36 @@ type OpenAIChatUsage struct {
 	TotalTokens      int `json:"total_tokens"`      // 总 Token 数
 }
 
-// Polish 执行文本润色
-// 参数:
-//   - text: 待处理的文本
-//   - videoType: 视频类型（professional_tech, casual_natural, educational_rigorous, default）
-//   - customPrompt: 用户自定义 Prompt（可选）
-//   - apiKey: 解密后的 API 密钥（OpenAI API Key 或第三方中转服务 API Key）
-//   - endpoint: 自定义端点 URL（为空则使用默认端点 https://api.openai.com）
+// Polish 执行文本润色并返回润色后的内容。
 //
-// 返回:
-//   - polishedText: 润色后的文本
-//   - error: 错误信息（401: API密钥无效, 429: API配额不足, 400: Prompt格式错误, 5xx: 外部API服务错误）
+// 功能说明:
+//   - 根据视频类型生成系统提示词，组合自定义 Prompt，调用 OpenAI 模型润色文本。
+//
+// 设计决策:
+//   - 复用 callOpenAIAPI 以统一重试与错误处理逻辑。
+//
+// 使用示例:
+//
+//	polished, err := adapter.Polish(text, "professional_tech", "", apiKey, endpoint)
+//
+// 参数说明:
+//
+//	text string: 待润色文本，不能为空。
+//	videoType string: 视频语气标签，决定系统 Prompt 语气。
+//	customPrompt string: 可选自定义提示词，空字符串使用默认模版。
+//	apiKey string: OpenAI 或兼容代理的鉴权密钥。
+//	endpoint string: 可选自定义 API 地址，留空使用默认 https://api.openai.com。
+//
+// 返回值说明:
+//
+//	string: 润色后的文本。
+//	error: 调用失败或返回内容为空时出错。
+//
+// 错误处理说明:
+//   - 将 HTTP 401/403、429、400、5xx 等错误映射为具备上下文的错误信息。
+//
+// 注意事项:
+//   - 长文本可能触发 Token 限制，调用方应做好截断或重试策略。
 func (o *OpenAILLMAdapter) Polish(text, videoType, customPrompt, apiKey, endpoint string) (string, error) {
 	log.Printf("[OpenAILLMAdapter] Starting text polishing: video_type=%s", videoType)
 
@@ -101,15 +158,31 @@ func (o *OpenAILLMAdapter) Polish(text, videoType, customPrompt, apiKey, endpoin
 	return polishedText, nil
 }
 
-// Optimize 执行译文优化
-// 参数:
-//   - text: 待优化的文本
-//   - apiKey: 解密后的 API 密钥（OpenAI API Key 或第三方中转服务 API Key）
-//   - endpoint: 自定义端点 URL（为空则使用默认端点 https://api.openai.com）
+// Optimize 执行译文优化，提升可读性和表达一致性。
 //
-// 返回:
-//   - optimizedText: 优化后的文本
-//   - error: 错误信息（401: API密钥无效, 429: API配额不足, 5xx: 外部API服务错误）
+// 功能说明:
+//   - 以固定系统 Prompt 指导模型优化翻译结果，使语句更流畅自然。
+//
+// 使用示例:
+//
+//	optimized, err := adapter.Optimize(text, apiKey, endpoint)
+//
+// 参数说明:
+//
+//	text string: 待优化文本，不能为空。
+//	apiKey string: OpenAI 或兼容代理的鉴权密钥。
+//	endpoint string: 可选自定义 API 地址，留空使用默认 https://api.openai.com。
+//
+// 返回值说明:
+//
+//	string: 优化后的文本。
+//	error: 调用失败或返回内容为空时出错。
+//
+// 错误处理说明:
+//   - 401/403、429、5xx 等错误会被统一封装为具上下文的错误。
+//
+// 注意事项:
+//   - 输入长度需满足模型上下文限制，调用方可在外层做分页处理。
 func (o *OpenAILLMAdapter) Optimize(text, apiKey, endpoint string) (string, error) {
 	log.Printf("[OpenAILLMAdapter] Starting translation optimization")
 
@@ -132,7 +205,28 @@ func (o *OpenAILLMAdapter) Optimize(text, apiKey, endpoint string) (string, erro
 	return optimizedText, nil
 }
 
-// callOpenAIAPI 调用 OpenAI Chat Completions API
+// callOpenAIAPI 调用 OpenAI Chat Completions API 并返回生成文本。
+//
+// 功能说明:
+//   - 构造对话请求、拼接 endpoint、执行带重试的请求，并提取首个候选内容。
+//
+// 设计决策:
+//   - 重试逻辑集中于此，Polish/Optimize 共享统一错误处理。
+//
+// 参数说明:
+//
+//	systemPrompt string: 系统角色提示语。
+//	userPrompt string: 用户输入文本。
+//	apiKey string: OpenAI 或代理鉴权密钥。
+//	endpoint string: 可选自定义 API 地址。
+//
+// 返回值说明:
+//
+//	string: 模型生成的文本。
+//	error: 当请求失败或响应为空时返回。
+//
+// 注意事项:
+//   - 对于不可重试错误（401/403、429、400）将立即返回，避免无畏重试。
 func (o *OpenAILLMAdapter) callOpenAIAPI(systemPrompt, userPrompt, apiKey, endpoint string) (string, error) {
 	// 步骤 1: 构建请求体
 	requestBody := OpenAIChatRequest{
@@ -200,7 +294,24 @@ func (o *OpenAILLMAdapter) callOpenAIAPI(systemPrompt, userPrompt, apiKey, endpo
 	return generatedText, nil
 }
 
-// sendOpenAIRequest 发送 OpenAI HTTP 请求
+// sendOpenAIRequest 发送 OpenAI HTTP 请求并解析响应为结构体。
+//
+// 功能说明:
+//   - 设置认证头，校验 HTTP 状态码，将成功响应解码为 OpenAIChatResponse。
+//
+// 参数说明:
+//
+//	endpoint string: 完整 API 路径。
+//	requestJSON []byte: 序列化后的请求体。
+//	apiKey string: OpenAI 或代理鉴权密钥。
+//
+// 返回值说明:
+//
+//	*OpenAIChatResponse: 成功时返回的响应对象。
+//	error: 网络请求失败或响应异常时返回。
+//
+// 注意事项:
+//   - 将 401/403、429、400、5xx 等错误封装为含响应体的错误信息，便于上层排查。
 func (o *OpenAILLMAdapter) sendOpenAIRequest(endpoint string, requestJSON []byte, apiKey string) (*OpenAIChatResponse, error) {
 	// 创建 HTTP 请求
 	req, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(requestJSON))

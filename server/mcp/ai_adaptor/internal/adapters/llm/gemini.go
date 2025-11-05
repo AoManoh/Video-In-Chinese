@@ -12,13 +12,52 @@ import (
 	"video-in-chinese/ai_adaptor/internal/utils"
 )
 
-// GeminiLLMAdapter Google Gemini LLM 适配器
-// 实现 LLMAdapter 接口，调用 Google Gemini API
+// GeminiLLMAdapter 封装 Google Gemini API，实现 LLMAdapter 接口。
+//
+// 功能说明:
+//   - 提供文本润色与译文优化能力，支持 Gemini 官方接口。
+//
+// 设计决策:
+//   - 采用 120 秒超时的 http.Client，以满足长上下文生成。
+//
+// 使用示例:
+//
+//	adapter := NewGeminiLLMAdapter()
+//	optimized, err := adapter.Optimize(text, apiKey, "")
+//
+// 参数说明:
+//   - 不适用: 结构体实例通过构造函数创建。
+//
+// 返回值说明:
+//   - 不适用: 结构体用于持有 HTTP 客户端。
+//
+// 错误处理说明:
+//   - 由 Polish/Optimize 方法统一处理 HTTP 状态码错误。
+//
+// 注意事项:
+//   - endpoint 可指向自定义路由以支持代理或多区域部署。
 type GeminiLLMAdapter struct {
 	client *http.Client
 }
 
-// NewGeminiLLMAdapter 创建新的 Gemini LLM 适配器
+// NewGeminiLLMAdapter 创建 Gemini LLM 适配器实例并初始化 HTTP 客户端。
+//
+// 功能说明:
+//   - 提供默认超时配置，开箱即用连接 Gemini API。
+//
+// 设计决策:
+//   - 封装 http.Client，方便后续替换 Transport 或超时设置。
+//
+// 使用示例:
+//
+//	adapter := NewGeminiLLMAdapter()
+//
+// 返回值说明:
+//
+//	*GeminiLLMAdapter: 已初始化的适配器实例。
+//
+// 注意事项:
+//   - 若需自定义代理，可替换返回值的 client 字段。
 func NewGeminiLLMAdapter() *GeminiLLMAdapter {
 	return &GeminiLLMAdapter{
 		client: &http.Client{
@@ -83,17 +122,36 @@ type GeminiPromptFeedback struct {
 	SafetyRatings []GeminiSafetyRating `json:"safetyRatings"` // 安全评级
 }
 
-// Polish 执行文本润色
-// 参数:
-//   - text: 待处理的文本
-//   - videoType: 视频类型（professional_tech, casual_natural, educational_rigorous, default）
-//   - customPrompt: 用户自定义 Prompt（可选）
-//   - apiKey: 解密后的 API 密钥（Google Cloud API Key）
-//   - endpoint: 自定义端点 URL（为空则使用默认端点）
+// Polish 调用 Gemini 模型执行文本润色并返回润色后的内容。
 //
-// 返回:
-//   - polishedText: 润色后的文本
-//   - error: 错误信息（401: API密钥无效, 429: API配额不足, 400: Prompt格式错误, 5xx: 外部API服务错误）
+// 功能说明:
+//   - 根据视频类型生成系统提示词，组合自定义 Prompt，调用 Gemini API 生成润色结果。
+//
+// 设计决策:
+//   - 通过 callGeminiAPI 统一处理请求构造、重试与错误分类。
+//
+// 使用示例:
+//
+//	polished, err := adapter.Polish(text, "casual_natural", "", apiKey, endpoint)
+//
+// 参数说明:
+//
+//	text string: 待润色文本，不能为空。
+//	videoType string: 视频语气标签，用于选择默认 Prompt。
+//	customPrompt string: 可选自定义提示词，空字符串使用默认模版。
+//	apiKey string: Google Cloud API Key。
+//	endpoint string: 可选自定义端点，留空使用官方 URL。
+//
+// 返回值说明:
+//
+//	string: 润色后的文本。
+//	error: 调用失败或返回内容为空时出错。
+//
+// 错误处理说明:
+//   - 将 401/403、429、400、5xx 等错误封装为具上下文的信息。
+//
+// 注意事项:
+//   - Gemini API 需要在 URL 中附带 key，调用方应妥善保管凭证。
 func (g *GeminiLLMAdapter) Polish(text, videoType, customPrompt, apiKey, endpoint string) (string, error) {
 	log.Printf("[GeminiLLMAdapter] Starting text polishing: video_type=%s", videoType)
 
@@ -116,15 +174,31 @@ func (g *GeminiLLMAdapter) Polish(text, videoType, customPrompt, apiKey, endpoin
 	return polishedText, nil
 }
 
-// Optimize 执行译文优化
-// 参数:
-//   - text: 待优化的文本
-//   - apiKey: 解密后的 API 密钥（Google Cloud API Key）
-//   - endpoint: 自定义端点 URL（为空则使用默认端点）
+// Optimize 调用 Gemini 模型对文本执行语义优化。
 //
-// 返回:
-//   - optimizedText: 优化后的文本
-//   - error: 错误信息（401: API密钥无效, 429: API配额不足, 5xx: 外部API服务错误）
+// 功能说明:
+//   - 通过固定系统 Prompt 指导模型对翻译结果做整体润色与逻辑整理。
+//
+// 使用示例:
+//
+//	optimized, err := adapter.Optimize(text, apiKey, endpoint)
+//
+// 参数说明:
+//
+//	text string: 待优化文本，不能为空。
+//	apiKey string: Google Cloud API Key。
+//	endpoint string: 可选自定义端点，留空使用官方 URL。
+//
+// 返回值说明:
+//
+//	string: 优化后的文本。
+//	error: 调用失败或返回内容为空时出错。
+//
+// 错误处理说明:
+//   - 401/403、429、5xx 等错误会被归类并返回，方便上层处理。
+//
+// 注意事项:
+//   - 任务需满足 Gemini 模型的 Token 限制，建议调用方控制输入长度。
 func (g *GeminiLLMAdapter) Optimize(text, apiKey, endpoint string) (string, error) {
 	log.Printf("[GeminiLLMAdapter] Starting translation optimization")
 
@@ -147,7 +221,25 @@ func (g *GeminiLLMAdapter) Optimize(text, apiKey, endpoint string) (string, erro
 	return optimizedText, nil
 }
 
-// callGeminiAPI 调用 Gemini API
+// callGeminiAPI 调用 Gemini API 并返回首个候选文本。
+//
+// 功能说明:
+//   - 构造请求体、补全端点、执行带重试的请求，并提取候选文本。
+//
+// 参数说明:
+//
+//	systemPrompt string: 系统提示语。
+//	userPrompt string: 用户输入文本。
+//	apiKey string: Google Cloud API Key。
+//	endpoint string: 可选自定义端点。
+//
+// 返回值说明:
+//
+//	string: Gemini 模型返回的文本。
+//	error: 当请求失败或响应为空时返回。
+//
+// 注意事项:
+//   - URL 可能需包含 `key` 参数，调用方需确保凭证安全。
 func (g *GeminiLLMAdapter) callGeminiAPI(systemPrompt, userPrompt, apiKey, endpoint string) (string, error) {
 	// 步骤 1: 构建请求体
 	requestBody := GeminiRequest{
@@ -227,7 +319,23 @@ func (g *GeminiLLMAdapter) callGeminiAPI(systemPrompt, userPrompt, apiKey, endpo
 	return generatedText, nil
 }
 
-// sendGeminiRequest 发送 Gemini HTTP 请求
+// sendGeminiRequest 发送 Gemini HTTP 请求并解析响应。
+//
+// 功能说明:
+//   - 构造 POST 请求、设置 JSON 头部、检查状态码并解码响应。
+//
+// 参数说明:
+//
+//	endpoint string: 完整 Gemini API URL，应包含 key 参数。
+//	requestJSON []byte: 序列化后的请求体。
+//
+// 返回值说明:
+//
+//	*GeminiResponse: 成功时的响应对象。
+//	error: HTTP 请求失败或响应异常时返回。
+//
+// 注意事项:
+//   - 对 401/403、429、400、5xx 错误提供详细提示以便上层处理。
 func (g *GeminiLLMAdapter) sendGeminiRequest(endpoint string, requestJSON []byte) (*GeminiResponse, error) {
 	// 创建 HTTP 请求
 	req, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(requestJSON))
@@ -277,7 +385,10 @@ func (g *GeminiLLMAdapter) sendGeminiRequest(endpoint string, requestJSON []byte
 	return &geminiResponse, nil
 }
 
-// buildPolishPrompt 构建文本润色 Prompt
+// buildPolishPrompt 根据视频类型构建文本润色 Prompt，支持自定义覆盖。
+//
+// 功能说明:
+//   - 若提供 customPrompt 则直接返回，否则按视频类型返回默认模版。
 func buildPolishPrompt(videoType, customPrompt string) string {
 	// 如果用户提供了自定义 Prompt，则使用自定义 Prompt
 	if customPrompt != "" {

@@ -14,13 +14,58 @@ import (
 	pb "video-in-chinese/ai_adaptor/proto"
 )
 
-// AliyunASRAdapter 阿里云语音识别适配器
-// 实现 ASRAdapter 接口，调用阿里云智能语音交互 API
+// AliyunASRAdapter 封装阿里云智能语音交互 API 的调用，实现 ASRAdapter 接口。
+//
+// 功能说明:
+//   - 负责音频上传、任务提交与结果解析，输出符合 pb.Speaker 的结构。
+//
+// 设计决策:
+//   - 使用内置 http.Client 并设置较长超时时间，适配大文件识别场景。
+//
+// 使用示例:
+//
+//	adapter := NewAliyunASRAdapter()
+//	speakers, err := adapter.ASR(audioPath, apiKey, "")
+//
+// 参数说明:
+//   - 不适用: 结构体实例通过构造函数创建。
+//
+// 返回值说明:
+//   - 不适用: 结构体用于保存状态。
+//
+// 错误处理说明:
+//   - 具体错误在 ASR 方法中返回。
+//
+// 注意事项:
+//   - 调用前需配置 OSS 相关环境变量以支持音频上传。
 type AliyunASRAdapter struct {
 	client *http.Client
 }
 
-// NewAliyunASRAdapter 创建新的阿里云 ASR 适配器
+// NewAliyunASRAdapter 创建阿里云 ASR 适配器实例并初始化 HTTP 客户端。
+//
+// 功能说明:
+//   - 返回带有默认超时设置的适配器实例。
+//
+// 设计决策:
+//   - 使用 120 秒超时覆盖长音频场景，避免识别中途断开。
+//
+// 使用示例:
+//
+//	adapter := NewAliyunASRAdapter()
+//
+// 参数说明:
+//   - 无参数。
+//
+// 返回值说明:
+//
+//	*AliyunASRAdapter: 可直接调用 ASR 方法的适配器。
+//
+// 错误处理说明:
+//   - 函数不返回错误，如需定制客户端可在外层包装。
+//
+// 注意事项:
+//   - 若需自定义超时，可在返回值上替换 client。
 func NewAliyunASRAdapter() *AliyunASRAdapter {
 	return &AliyunASRAdapter{
 		client: &http.Client{
@@ -29,7 +74,29 @@ func NewAliyunASRAdapter() *AliyunASRAdapter {
 	}
 }
 
-// AliyunASRRequest 阿里云 ASR API 请求结构
+// AliyunASRRequest 表示阿里云 ASR API 的请求体，字段与官方协议保持一致。
+//
+// 功能说明:
+//   - 配置音频来源、识别模式及输出选项。
+//
+// 设计决策:
+//   - 使用 json 标签匹配阿里云接口要求。
+//
+// 使用示例:
+//
+//	req := AliyunASRRequest{AppKey: apiKey, FileLink: url}
+//
+// 参数说明:
+//   - 不适用: 结构体字段由调用方赋值。
+//
+// 返回值说明:
+//   - 不适用。
+//
+// 错误处理说明:
+//   - 构造阶段不产生错误，序列化失败将由调用方捕获。
+//
+// 注意事项:
+//   - FileLink 需为阿里云可访问的 URL。
 type AliyunASRRequest struct {
 	AppKey            string `json:"appkey"`             // 应用 Key
 	FileLink          string `json:"file_link"`          // 音频文件 URL（OSS 公网地址）
@@ -40,7 +107,30 @@ type AliyunASRRequest struct {
 	EnablePunctuation bool   `json:"enable_punctuation"` // 是否启用标点符号
 }
 
-// AliyunASRResponse 阿里云 ASR API 响应结构
+// AliyunASRResponse 映射阿里云 ASR API 的响应结构。
+//
+// 功能说明:
+//   - 承载识别状态码、文本及句子明细。
+//
+// 设计决策:
+//   - 保留 StatusCode 供上层判断业务态。
+//
+// 使用示例:
+//
+//	var resp AliyunASRResponse
+//	_ = json.Unmarshal(body, &resp)
+//
+// 参数说明:
+//   - 不适用。
+//
+// 返回值说明:
+//   - 不适用。
+//
+// 错误处理说明:
+//   - 解码错误由调用方处理。
+//
+// 注意事项:
+//   - StatusCode 为 20000000 时表示成功。
 type AliyunASRResponse struct {
 	RequestID  string           `json:"request_id"`  // 请求 ID
 	StatusCode int              `json:"status_code"` // 状态码（20000000 表示成功）
@@ -48,12 +138,24 @@ type AliyunASRResponse struct {
 	Result     *AliyunASRResult `json:"result"`      // 识别结果
 }
 
-// AliyunASRResult 阿里云 ASR 识别结果
+// AliyunASRResult 表示响应中的识别结果部分。
+//
+// 功能说明:
+//   - 包含句子数组，用于后续转换为 pb.Speaker。
+//
+// 注意事项:
+//   - 空结果需在调用方进行错误处理。
 type AliyunASRResult struct {
 	Sentences []AliyunSentence `json:"sentences"` // 句子列表
 }
 
-// AliyunSentence 阿里云句子结构
+// AliyunSentence 对应识别结果中的单句数据，含文本与时间戳。
+//
+// 功能说明:
+//   - 为时间戳转换和说话人聚合提供原始数据。
+//
+// 注意事项:
+//   - BeginTime 和 EndTime 单位为毫秒。
 type AliyunSentence struct {
 	Text         string `json:"text"`          // 句子文本
 	BeginTime    int64  `json:"begin_time"`    // 开始时间（毫秒）
@@ -62,15 +164,37 @@ type AliyunSentence struct {
 	EmotionValue string `json:"emotion_value"` // 情绪值（可选）
 }
 
-// ASR 执行语音识别，返回说话人列表
-// 参数:
-//   - audioPath: 音频文件的本地路径
-//   - apiKey: 解密后的 API 密钥（阿里云 AppKey）
-//   - endpoint: 自定义端点 URL（为空则使用默认端点）
+// ASR 执行一次离线语音识别，并以说话人列表形式返回结果。
 //
-// 返回:
-//   - speakers: 说话人列表，包含句子级时间戳和文本
-//   - error: 错误信息（401: API密钥无效, 429: API配额不足, 5xx: 外部API服务错误）
+// 功能说明:
+//   - 校验音频文件、上传到 OSS、调用阿里云 ASR API 并解析返回句子。
+//
+// 设计决策:
+//   - 默认启用说话人分离与标点，便于字幕生成。
+//   - 内置重试策略缓解瞬时网络故障和限流。
+//
+// 使用示例:
+//
+//	speakers, err := adapter.ASR("./input.wav", apiKey, "")
+//
+// 参数说明:
+//
+//	audioPath string: 本地音频文件路径。
+//	apiKey string: 阿里云 AppKey（需提前解密）。
+//	endpoint string: 自定义端点 URL，空字符串使用默认值。
+//
+// 返回值说明:
+//
+//	[]*pb.Speaker: 识别结果，按说话人聚合并包含句子时间戳。
+//	error: 上传、网络或识别失败时返回。
+//
+// 错误处理说明:
+//   - HTTP 401/403 映射为密钥无效，429 表示限流，5xx 表示供应商故障。
+//   - JSON 解析失败时返回原始响应，便于排查。
+//
+// 注意事项:
+//   - 调用前需配置 OSS 环境变量支持音频上传。
+//   - 长音频识别耗时较久，调用方应设置上下文超时。
 func (a *AliyunASRAdapter) ASR(audioPath, apiKey, endpoint string) ([]*pb.Speaker, error) {
 	log.Printf("[AliyunASRAdapter] Starting ASR: audio_path=%s", audioPath)
 
@@ -84,8 +208,7 @@ func (a *AliyunASRAdapter) ASR(audioPath, apiKey, endpoint string) ([]*pb.Speake
 	// 生产环境应该通过 logic 层传递完整的 AppConfig
 	fileLink, err := a.uploadToOSS(audioPath)
 	if err != nil {
-		log.Printf("[AliyunASRAdapter] WARNING: OSS upload failed, using local path: %v", err)
-		fileLink = audioPath // 降级方案：使用本地文件路径
+		return nil, fmt.Errorf("上传音频到 OSS 失败: %w", err)
 	}
 
 	// 步骤 3: 构建 API 请求
@@ -200,7 +323,32 @@ func (a *AliyunASRAdapter) sendASRRequest(endpoint string, requestJSON []byte, a
 	return &asrResponse, nil
 }
 
-// parseASRResponse 解析 ASR 响应，转换为 Speaker 列表
+// parseASRResponse 解析阿里云 ASR 响应并转换为 pb.Speaker 列表。
+//
+// 功能说明:
+//   - 将句子按说话人分组，并转换为 protobuf 定义。
+//
+// 设计决策:
+//   - 使用 map 聚合说话人，保持输出顺序稳定。
+//
+// 使用示例:
+//
+//	speakers, err := a.parseASRResponse(resp)
+//
+// 参数说明:
+//
+//	response *AliyunASRResponse: 识别响应。
+//
+// 返回值说明:
+//
+//	[]*pb.Speaker: 结构化的识别结果。
+//	error: 当结果为空或数据异常时返回。
+//
+// 错误处理说明:
+//   - 若响应不包含结果，将返回错误提示调用方检查音频或参数。
+//
+// 注意事项:
+//   - 阿里云可能返回空说话人，此时会 fallback 到默认 speaker_0。
 func (a *AliyunASRAdapter) parseASRResponse(response *AliyunASRResponse) ([]*pb.Speaker, error) {
 	if response.Result == nil || len(response.Result.Sentences) == 0 {
 		return nil, fmt.Errorf("ASR 响应中没有识别结果")
@@ -243,14 +391,32 @@ func (a *AliyunASRAdapter) parseASRResponse(response *AliyunASRResponse) ([]*pb.
 	return speakers, nil
 }
 
-// uploadToOSS 上传音频文件到阿里云 OSS
+// uploadToOSS 将音频文件上传至阿里云 OSS，并返回公开访问 URL。
 //
-// 参数:
-//   - audioPath: 本地音频文件路径
+// 功能说明:
+//   - 构造 OSS 上传器并完成文件上传，用于供应商 API 访问。
 //
-// 返回:
-//   - publicURL: OSS 公开访问 URL
-//   - error: 错误信息
+// 设计决策:
+//   - 遇到配置缺失时返回模拟 URL，保持降级能力。
+//
+// 使用示例:
+//
+//	url, err := a.uploadToOSS("./audio.wav")
+//
+// 参数说明:
+//
+//	audioPath string: 本地音频文件路径。
+//
+// 返回值说明:
+//
+//	string: 上传后的公开 URL。
+//	error: 当配置缺失或上传失败时返回，降级情况下返回空字符串。
+//
+// 错误处理说明:
+//   - OSS 配置缺失将返回错误提示调用方补全。
+//
+// 注意事项:
+//   - 需在环境中设置 ALIYUN_OSS_* 参数确保上传成功。
 func (a *AliyunASRAdapter) uploadToOSS(audioPath string) (string, error) {
 	// 从环境变量读取 OSS 配置
 	accessKeyID := os.Getenv("ALIYUN_OSS_ACCESS_KEY_ID")
@@ -281,12 +447,24 @@ func (a *AliyunASRAdapter) uploadToOSS(audioPath string) (string, error) {
 	return publicURL, nil
 }
 
-// contains 检查字符串是否包含子串
+// contains 检查字符串是否包含子串，用于兼容低版本 SDK 的错误提示。
+//
+// 功能说明:
+//   - 基于字符串长度快速判断是否包含特定子串。
+//
+// 注意事项:
+//   - 仅用于处理阿里云错误码，通用场景建议使用 strings.Contains。
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && (s[:len(substr)] == substr || s[len(s)-len(substr):] == substr || containsSubstring(s, substr)))
 }
 
-// containsSubstring 辅助函数：检查字符串是否包含子串
+// containsSubstring 辅助 contains 进行逐字符匹配。
+//
+// 功能说明:
+//   - 线性扫描判断是否包含目标子串。
+//
+// 注意事项:
+//   - 时间复杂度 O(n*m)，仅用于小字符串匹配。
 func containsSubstring(s, substr string) bool {
 	for i := 0; i <= len(s)-len(substr); i++ {
 		if s[i:i+len(substr)] == substr {

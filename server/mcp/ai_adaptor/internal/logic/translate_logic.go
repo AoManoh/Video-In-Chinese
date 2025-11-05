@@ -10,13 +10,17 @@ import (
 	pb "video-in-chinese/ai_adaptor/proto"
 )
 
-// TranslateLogic 翻译服务逻辑
+// TranslateLogic orchestrates translation workflows by combining configuration
+// lookups with adapter resolution. It keeps business logic isolated from
+// transport layers so providers can be swapped without touching handlers.
 type TranslateLogic struct {
 	registry      *adapters.AdapterRegistry
 	configManager *config.ConfigManager
 }
 
-// NewTranslateLogic 创建新的翻译服务逻辑实例
+// NewTranslateLogic wires a TranslateLogic with the shared adapter registry and
+// configuration manager. Consumers should reuse the returned instance to take
+// advantage of ConfigManager caching.
 func NewTranslateLogic(registry *adapters.AdapterRegistry, configManager *config.ConfigManager) *TranslateLogic {
 	return &TranslateLogic{
 		registry:      registry,
@@ -24,12 +28,42 @@ func NewTranslateLogic(registry *adapters.AdapterRegistry, configManager *config
 	}
 }
 
-// ProcessTranslate 处理翻译请求
-// 步骤：
-//  1. 从 Redis 读取翻译适配器配置（使用 ConfigManager）
-//  2. 从适配器注册表获取对应的翻译适配器实例
-//  3. 调用适配器的 Translate 方法执行翻译
-//  4. 处理错误并返回翻译结果
+// ProcessTranslate executes a translation request using the provider defined in
+// runtime configuration.
+//
+// Workflow:
+//  1. Validate source text and language codes.
+//  2. Load provider credentials and feature toggles from ConfigManager
+//     (Redis + in-memory cache).
+//  3. Resolve the translation adapter from AdapterRegistry.
+//  4. Invoke the adapter and return the translated text.
+//
+// Parameters:
+//   - ctx: Propagates deadlines and cancellation to downstream adapters.
+//   - req: gRPC payload describing the text and language pair.
+//
+// Returns:
+//   - *pb.TranslateResponse containing the translated text on success.
+//   - error describing validation, configuration, registry, or adapter
+//     failures.
+//
+// Design considerations:
+//   - Video type fallbacks ensure callers are not required to pass optional
+//     metadata while still enabling provider-specific prompts.
+//   - Formatting and error messages remain user-oriented while preserving root
+//     causes for observability.
+//
+// Example:
+//
+//	res, err := l.ProcessTranslate(ctx, &pb.TranslateRequest{
+//		Text:       "你好世界",
+//		SourceLang: "zh-CN",
+//		TargetLang: "en-US",
+//	})
+//	if err != nil {
+//		return err
+//	}
+//	log.Printf("translated length: %d", len(res.TranslatedText))
 func (l *TranslateLogic) ProcessTranslate(ctx context.Context, req *pb.TranslateRequest) (*pb.TranslateResponse, error) {
 	log.Printf("[TranslateLogic] Processing translate request: text_length=%d, source_lang=%s, target_lang=%s",
 		len(req.Text), req.SourceLang, req.TargetLang)
@@ -95,4 +129,3 @@ func (l *TranslateLogic) ProcessTranslate(ctx context.Context, req *pb.Translate
 		TranslatedText: translatedText,
 	}, nil
 }
-

@@ -11,17 +11,56 @@ import (
 	"os"
 	"time"
 
-	pb "video-in-chinese/ai_adaptor/proto"
 	"video-in-chinese/ai_adaptor/internal/utils"
+	pb "video-in-chinese/ai_adaptor/proto"
 )
 
-// GoogleASRAdapter Google 语音识别适配器
-// 实现 ASRAdapter 接口，调用 Google Speech-to-Text API
+// GoogleASRAdapter 封装 Google Speech-to-Text API 的批量识别能力，实现 ASRAdapter 接口。
+//
+// 功能说明:
+//   - 负责构造识别请求、上传音频并解析返回结果。
+//
+// 设计决策:
+//   - 内置 http.Client 并设置 120 秒超时以兼容长音频识别。
+//
+// 使用示例:
+//
+//	adapter := NewGoogleASRAdapter()
+//	speakers, err := adapter.ASR(audioPath, apiKey, "")
+//
+// 参数说明:
+//   - 不适用: 结构体通过构造函数创建。
+//
+// 返回值说明:
+//   - 不适用: 结构体用于维持客户端状态。
+//
+// 错误处理说明:
+//   - 具体错误在 ASR 与内部辅助方法中返回。
+//
+// 注意事项:
+//   - 调用前需准备 Google Cloud Speech API Key 或服务账号凭证。
 type GoogleASRAdapter struct {
 	client *http.Client
 }
 
-// NewGoogleASRAdapter 创建新的 Google ASR 适配器
+// NewGoogleASRAdapter 创建 Google ASR 适配器实例并初始化 HTTP 客户端。
+//
+// 功能说明:
+//   - 提供默认超时配置的适配器实例，供业务层直接调用。
+//
+// 设计决策:
+//   - 将 http.Client 封装在结构体中，便于测试注入。
+//
+// 使用示例:
+//
+//	adapter := NewGoogleASRAdapter()
+//
+// 返回值说明:
+//
+//	*GoogleASRAdapter: 已初始化的适配器实例。
+//
+// 注意事项:
+//   - 若需自定义超时或代理，可修改返回值的 client 字段。
 func NewGoogleASRAdapter() *GoogleASRAdapter {
 	return &GoogleASRAdapter{
 		client: &http.Client{
@@ -30,71 +69,106 @@ func NewGoogleASRAdapter() *GoogleASRAdapter {
 	}
 }
 
-// GoogleASRRequest Google Speech-to-Text API 请求结构
+// GoogleASRRequest 描述 Google Speech-to-Text API 的同步识别请求体。
+//
+// 功能说明:
+//   - 封装识别配置与音频数据。
+//
+// 注意事项:
+//   - Audio 可通过 Base64 内容或 Cloud Storage URI 提供。
 type GoogleASRRequest struct {
 	Config GoogleRecognitionConfig `json:"config"` // 识别配置
 	Audio  GoogleRecognitionAudio  `json:"audio"`  // 音频数据
 }
 
-// GoogleRecognitionConfig Google 识别配置
+// GoogleRecognitionConfig 定义 Google 识别任务的模型、语种及时间戳等参数。
+//
+// 功能说明:
+//   - 控制编码格式、采样率、语言、标点、说话人分离等选项。
+//
+// 注意事项:
+//   - 启用 DiarizationConfig 时需设置说话人数范围以提升准确率。
 type GoogleRecognitionConfig struct {
-	Encoding                   string                      `json:"encoding"`                   // 音频编码格式（如 "LINEAR16", "FLAC"）
-	SampleRateHertz            int                         `json:"sampleRateHertz"`            // 采样率（如 16000）
-	LanguageCode               string                      `json:"languageCode"`               // 语言代码（如 "zh-CN", "en-US"）
-	EnableAutomaticPunctuation bool                        `json:"enableAutomaticPunctuation"` // 启用自动标点符号
-	EnableWordTimeOffsets      bool                        `json:"enableWordTimeOffsets"`      // 启用词级别时间偏移
-	DiarizationConfig          *GoogleDiarizationConfig    `json:"diarizationConfig,omitempty"` // 说话人分离配置
-	Model                      string                      `json:"model,omitempty"`            // 识别模型（如 "default", "video"）
+	Encoding                   string                   `json:"encoding"`                    // 音频编码格式（如 "LINEAR16", "FLAC"）
+	SampleRateHertz            int                      `json:"sampleRateHertz"`             // 采样率（如 16000）
+	LanguageCode               string                   `json:"languageCode"`                // 语言代码（如 "zh-CN", "en-US"）
+	EnableAutomaticPunctuation bool                     `json:"enableAutomaticPunctuation"`  // 启用自动标点符号
+	EnableWordTimeOffsets      bool                     `json:"enableWordTimeOffsets"`       // 启用词级别时间偏移
+	DiarizationConfig          *GoogleDiarizationConfig `json:"diarizationConfig,omitempty"` // 说话人分离配置
+	Model                      string                   `json:"model,omitempty"`             // 识别模型（如 "default", "video"）
 }
 
-// GoogleDiarizationConfig Google 说话人分离配置
+// GoogleDiarizationConfig 配置说话人分离功能的开关及人数范围。
 type GoogleDiarizationConfig struct {
-	EnableSpeakerDiarization bool `json:"enableSpeakerDiarization"` // 启用说话人分离
+	EnableSpeakerDiarization bool `json:"enableSpeakerDiarization"`  // 启用说话人分离
 	MinSpeakerCount          int  `json:"minSpeakerCount,omitempty"` // 最小说话人数量
 	MaxSpeakerCount          int  `json:"maxSpeakerCount,omitempty"` // 最大说话人数量
 }
 
-// GoogleRecognitionAudio Google 音频数据
+// GoogleRecognitionAudio 表示识别音频，可通过 Base64 内容或 GCS URI 提供。
 type GoogleRecognitionAudio struct {
 	Content string `json:"content,omitempty"` // Base64 编码的音频内容
 	URI     string `json:"uri,omitempty"`     // Google Cloud Storage URI（如 "gs://bucket/audio.wav"）
 }
 
-// GoogleASRResponse Google Speech-to-Text API 响应结构
+// GoogleASRResponse 承载 Google Speech-to-Text API 的识别结果集合。
 type GoogleASRResponse struct {
 	Results []GoogleSpeechRecognitionResult `json:"results"` // 识别结果列表
 }
 
-// GoogleSpeechRecognitionResult Google 语音识别结果
+// GoogleSpeechRecognitionResult 表示一段识别结果，包含候选列表与语言信息。
 type GoogleSpeechRecognitionResult struct {
-	Alternatives      []GoogleSpeechRecognitionAlternative `json:"alternatives"`      // 识别候选列表
-	LanguageCode      string                               `json:"languageCode"`      // 语言代码
-	ResultEndTime     string                               `json:"resultEndTime"`     // 结果结束时间（如 "12.345s"）
+	Alternatives  []GoogleSpeechRecognitionAlternative `json:"alternatives"`  // 识别候选列表
+	LanguageCode  string                               `json:"languageCode"`  // 语言代码
+	ResultEndTime string                               `json:"resultEndTime"` // 结果结束时间（如 "12.345s"）
 }
 
-// GoogleSpeechRecognitionAlternative Google 识别候选
+// GoogleSpeechRecognitionAlternative 描述单个识别候选及其置信度与词级信息。
 type GoogleSpeechRecognitionAlternative struct {
-	Transcript string             `json:"transcript"` // 识别文本
-	Confidence float64            `json:"confidence"` // 置信度
-	Words      []GoogleWordInfo   `json:"words"`      // 词级别信息
+	Transcript string           `json:"transcript"` // 识别文本
+	Confidence float64          `json:"confidence"` // 置信度
+	Words      []GoogleWordInfo `json:"words"`      // 词级别信息
 }
 
-// GoogleWordInfo Google 词级别信息
+// GoogleWordInfo 描述词级别的时间戳与说话人标签，用于构建句子。
 type GoogleWordInfo struct {
-	StartTime    string `json:"startTime"`    // 开始时间（如 "0.5s"）
-	EndTime      string `json:"endTime"`      // 结束时间（如 "1.2s"）
-	Word         string `json:"word"`         // 词内容
-	SpeakerTag   int    `json:"speakerTag"`   // 说话人标签（如果启用了说话人分离）
+	StartTime  string `json:"startTime"`  // 开始时间（如 "0.5s"）
+	EndTime    string `json:"endTime"`    // 结束时间（如 "1.2s"）
+	Word       string `json:"word"`       // 词内容
+	SpeakerTag int    `json:"speakerTag"` // 说话人标签（如果启用了说话人分离）
 }
 
-// ASR 执行语音识别，返回说话人列表
-// 参数:
-//   - audioPath: 音频文件的本地路径
-//   - apiKey: 解密后的 API 密钥（Google Cloud API Key）
-//   - endpoint: 自定义端点 URL（为空则使用默认端点）
-// 返回:
-//   - speakers: 说话人列表，包含句子级时间戳和文本
-//   - error: 错误信息（401: API密钥无效, 429: API配额不足, 5xx: 外部API服务错误）
+// ASR 执行一次离线语音识别，并以说话人列表形式返回结果。
+//
+// 功能说明:
+//   - 读取本地音频、进行 Base64 编码、调用 Google Speech-to-Text API，并解析返回结果。
+//
+// 设计决策:
+//   - 采用同步识别接口，避免额外的异步任务管理。
+//   - 提前校验音频文件存在性，减少 API 调用失败。
+//
+// 使用示例:
+//
+//	speakers, err := adapter.ASR("./audio.wav", apiKey, "")
+//
+// 参数说明:
+//
+//	audioPath string: 本地音频文件路径。
+//	apiKey string: Google Cloud API Key，用于访问 Speech-to-Text。
+//	endpoint string: 自定义端点 URL，空字符串使用默认 `https://speech.googleapis.com/v1/speech:recognize`。
+//
+// 返回值说明:
+//
+//	[]*pb.Speaker: 识别结果，按说话人聚合并包含句子时间戳。
+//	error: 当音频缺失、网络异常或识别失败时返回。
+//
+// 错误处理说明:
+//   - HTTP 401/403 映射为认证失败；429 表示配额不足；5xx 表示服务故障。
+//   - JSON 解析失败会包含响应体以便排查。
+//
+// 注意事项:
+//   - 大于 10MB 的音频建议改用 GCS URI 上传，待后续实现 TODO。
+//   - 调用方应在上下文中配置超时和重试策略。
 func (g *GoogleASRAdapter) ASR(audioPath, apiKey, endpoint string) ([]*pb.Speaker, error) {
 	log.Printf("[GoogleASRAdapter] Starting ASR: audio_path=%s", audioPath)
 
@@ -178,7 +252,25 @@ func (g *GoogleASRAdapter) ASR(audioPath, apiKey, endpoint string) ([]*pb.Speake
 	return speakers, nil
 }
 
-// encodeAudioToBase64 读取音频文件并进行 Base64 编码
+// encodeAudioToBase64 读取音频文件并返回 Base64 编码字符串。
+//
+// 功能说明:
+//   - 将本地音频加载到内存后转换为 Base64，供 Speech-to-Text 同步接口使用。
+//
+// 设计决策:
+//   - 当前一次性读取文件，后续可根据 TODO 优化为流式或 GCS 上传。
+//
+// 参数说明:
+//
+//	audioPath string: 本地音频文件路径。
+//
+// 返回值说明:
+//
+//	string: Base64 编码后的音频内容。
+//	error: 读取文件失败时返回。
+//
+// 注意事项:
+//   - 对于超大文件，应改用云存储路径，避免内存占用。
 func (g *GoogleASRAdapter) encodeAudioToBase64(audioPath string) (string, error) {
 	// 读取音频文件
 	audioData, err := os.ReadFile(audioPath)
@@ -196,7 +288,24 @@ func (g *GoogleASRAdapter) encodeAudioToBase64(audioPath string) (string, error)
 	return encoded, nil
 }
 
-// sendASRRequest 发送 ASR HTTP 请求
+// sendASRRequest 向 Google Speech-to-Text API 发送同步识别请求并解析响应。
+//
+// 功能说明:
+//   - 构造 HTTP POST 请求、校验状态码并解码响应为 GoogleASRResponse。
+//
+// 参数说明:
+//
+//	endpoint string: 识别 API 端点。
+//	requestJSON []byte: 序列化后的请求体。
+//	apiKey string: Google Cloud API Key。
+//
+// 返回值说明:
+//
+//	*GoogleASRResponse: 成功时的识别结果。
+//	error: 网络请求失败或响应异常时返回。
+//
+// 注意事项:
+//   - 429 与 5xx 状态码会转化为错误，上层可据此实现退避重试。
 func (g *GoogleASRAdapter) sendASRRequest(endpoint string, requestJSON []byte, apiKey string) (*GoogleASRResponse, error) {
 	// 创建 HTTP 请求
 	req, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(requestJSON))
@@ -244,7 +353,22 @@ func (g *GoogleASRAdapter) sendASRRequest(endpoint string, requestJSON []byte, a
 	return &asrResponse, nil
 }
 
-// parseASRResponse 解析 ASR 响应，转换为 Speaker 列表
+// parseASRResponse 解析 Google 识别响应并转换为 pb.Speaker 列表。
+//
+// 功能说明:
+//   - 选择置信度最高的候选并按说话人标签聚合词级信息。
+//
+// 参数说明:
+//
+//	response *GoogleASRResponse: 识别结果。
+//
+// 返回值说明:
+//
+//	[]*pb.Speaker: 聚合后的说话人文本列表。
+//	error: 当响应为空或数据异常时返回。
+//
+// 注意事项:
+//   - 当缺少说话人标签时会默认归入 speaker_1。
 func (g *GoogleASRAdapter) parseASRResponse(response *GoogleASRResponse) ([]*pb.Speaker, error) {
 	if len(response.Results) == 0 {
 		return nil, fmt.Errorf("ASR 响应中没有识别结果")
@@ -291,8 +415,13 @@ func (g *GoogleASRAdapter) parseASRResponse(response *GoogleASRResponse) ([]*pb.
 	return speakers, nil
 }
 
-// mergeWordsIntoSentences 将词合并为句子
-// 简单策略：如果两个词之间的时间间隔超过 1 秒，则认为是新句子
+// mergeWordsIntoSentences 按时间顺序将词级结果聚合为句子。
+//
+// 功能说明:
+//   - 以 1 秒间隔作为句子切分阈值，并保留起止时间。
+//
+// 注意事项:
+//   - 逻辑为启发式实现，未来可根据标点或更精细规则优化。
 func (g *GoogleASRAdapter) mergeWordsIntoSentences(words []GoogleWordInfo) []*pb.Sentence {
 	if len(words) == 0 {
 		return nil
@@ -359,7 +488,13 @@ func (g *GoogleASRAdapter) mergeWordsIntoSentences(words []GoogleWordInfo) []*pb
 	return sentences
 }
 
-// parseGoogleTimestamp 解析 Google 时间戳格式（如 "1.5s"）为秒（float64）
+// parseGoogleTimestamp 将 Google 返回的时间戳（如 "1.5s"）解析为秒数。
+//
+// 功能说明:
+//   - 去除尾部单位并转换为 float64，供句子聚合使用。
+//
+// 注意事项:
+//   - 空字符串返回 0；解析失败时默认为 0。
 func parseGoogleTimestamp(timestamp string) float64 {
 	if timestamp == "" {
 		return 0.0
@@ -375,4 +510,3 @@ func parseGoogleTimestamp(timestamp string) float64 {
 	fmt.Sscanf(timestamp, "%f", &seconds)
 	return seconds
 }
-

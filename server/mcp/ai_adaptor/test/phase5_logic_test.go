@@ -9,7 +9,6 @@ import (
 	"video-in-chinese/ai_adaptor/internal/adapters/llm"
 	"video-in-chinese/ai_adaptor/internal/adapters/translation"
 	"video-in-chinese/ai_adaptor/internal/adapters/voice_cloning"
-	"video-in-chinese/ai_adaptor/internal/config"
 	"video-in-chinese/ai_adaptor/internal/logic"
 	"video-in-chinese/ai_adaptor/internal/voice_cache"
 	pb "video-in-chinese/ai_adaptor/proto"
@@ -79,10 +78,10 @@ func TestOptimizeLogicStructure(t *testing.T) {
 // TestCloneVoiceLogicStructure 测试声音克隆服务逻辑结构
 func TestCloneVoiceLogicStructure(t *testing.T) {
 	registry := adapters.NewAdapterRegistry()
-	
+
 	// 创建模拟的 VoiceManager（不需要真实的 Redis）
 	voiceManager := voice_cache.NewVoiceManager(nil)
-	
+
 	registry.RegisterVoiceCloning("aliyun_cosyvoice", voice_cloning.NewAliyunCosyVoiceAdapter(voiceManager))
 
 	cloneVoiceLogic := logic.NewCloneVoiceLogic(registry, nil)
@@ -345,4 +344,3 @@ func TestAdapterRegistryIntegration(t *testing.T) {
 
 	t.Log("✓ AdapterRegistry integration test passed")
 }
-

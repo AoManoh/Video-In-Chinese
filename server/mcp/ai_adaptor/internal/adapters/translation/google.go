@@ -12,13 +12,52 @@ import (
 	"video-in-chinese/ai_adaptor/internal/utils"
 )
 
-// GoogleTranslationAdapter Google 翻译适配器
-// 实现 TranslationAdapter 接口，调用 Google Cloud Translation API
+// GoogleTranslationAdapter 封装 Google Cloud Translation API 的调用，实现 TranslationAdapter 接口。
+//
+// 功能说明:
+//   - 构造翻译请求、发送到 Google Translation API，并解析返回文本。
+//
+// 设计决策:
+//   - 使用带 60 秒超时的 http.Client，兼顾网络抖动与响应时间。
+//
+// 使用示例:
+//
+//	adapter := NewGoogleTranslationAdapter()
+//	translated, err := adapter.Translate("Hello", "en", "zh", "default", apiKey, "")
+//
+// 参数说明:
+//   - 不适用: 结构体通过构造函数创建。
+//
+// 返回值说明:
+//   - 不适用: 结构体用于维护客户端实例。
+//
+// 错误处理说明:
+//   - Translate 方法会根据 HTTP 状态码返回具体错误。
+//
+// 注意事项:
+//   - 调用前需准备 Google Cloud Translation API Key。
 type GoogleTranslationAdapter struct {
 	client *http.Client
 }
 
-// NewGoogleTranslationAdapter 创建新的 Google 翻译适配器
+// NewGoogleTranslationAdapter 创建 Google 翻译适配器实例并初始化 HTTP 客户端。
+//
+// 功能说明:
+//   - 提供默认超时配置的适配器供业务层直接使用。
+//
+// 设计决策:
+//   - 将 http.Client 封装在结构体中，便于测试替换 Transport。
+//
+// 使用示例:
+//
+//	adapter := NewGoogleTranslationAdapter()
+//
+// 返回值说明:
+//
+//	*GoogleTranslationAdapter: 初始化完成的适配器实例。
+//
+// 注意事项:
+//   - 若需自定义超时，可在返回值上替换 client。
 func NewGoogleTranslationAdapter() *GoogleTranslationAdapter {
 	return &GoogleTranslationAdapter{
 		client: &http.Client{
@@ -27,7 +66,13 @@ func NewGoogleTranslationAdapter() *GoogleTranslationAdapter {
 	}
 }
 
-// GoogleTranslateRequest Google Translation API 请求结构
+// GoogleTranslateRequest 描述 Google Translation API 的请求体。
+//
+// 功能说明:
+//   - 指定源语言、目标语言、文本列表与翻译模型。
+//
+// 注意事项:
+//   - Google API 支持批量翻译，Q 可包含多条文本。
 type GoogleTranslateRequest struct {
 	Q      []string `json:"q"`      // 待翻译的文本列表
 	Source string   `json:"source"` // 源语言代码（如 "en"）
@@ -36,35 +81,57 @@ type GoogleTranslateRequest struct {
 	Model  string   `json:"model"`  // 翻译模型（"nmt" 或 "base"）
 }
 
-// GoogleTranslateResponse Google Translation API 响应结构
+// GoogleTranslateResponse 表示 Translation API 的顶层响应结构。
 type GoogleTranslateResponse struct {
 	Data GoogleTranslateData `json:"data"` // 翻译数据
 }
 
-// GoogleTranslateData Google 翻译数据
+// GoogleTranslateData 承载翻译结果数组。
 type GoogleTranslateData struct {
 	Translations []GoogleTranslation `json:"translations"` // 翻译结果列表
 }
 
-// GoogleTranslation Google 翻译结果
+// GoogleTranslation 描述单条翻译结果，包括翻译文本和检测到的源语言。
 type GoogleTranslation struct {
 	TranslatedText         string `json:"translatedText"`         // 翻译后的文本
 	DetectedSourceLanguage string `json:"detectedSourceLanguage"` // 检测到的源语言（如果未指定源语言）
 	Model                  string `json:"model"`                  // 使用的翻译模型
 }
 
-// Translate 执行文本翻译
-// 参数:
-//   - text: 待翻译的文本
-//   - sourceLang: 源语言代码（如 "en"）
-//   - targetLang: 目标语言代码（如 "zh"）
-//   - videoType: 视频类型（professional_tech, casual_natural, educational_rigorous, default）
-//   - apiKey: 解密后的 API 密钥（Google Cloud API Key）
-//   - endpoint: 自定义端点 URL（为空则使用默认端点）
+// Translate 执行一次文本翻译并返回翻译后的文本。
 //
-// 返回:
-//   - translatedText: 翻译后的文本
-//   - error: 错误信息（401: API密钥无效, 429: API配额不足, 400: 不支持的语言对, 5xx: 外部API服务错误）
+// 功能说明:
+//   - 对输入文本调用 Google Translation API，按需求选择模型并处理重试。
+//
+// 设计决策:
+//   - 使用 v2 接口的 `nmt` 模型以获得更佳翻译质量。
+//   - videoType 参数预留给后续扩展（例如 Glossary），当前不直接使用。
+//
+// 使用示例:
+//
+//	translated, err := adapter.Translate("Hello", "en", "zh", "default", apiKey, "")
+//
+// 参数说明:
+//
+//	text string: 待翻译文本，不能为空。
+//	sourceLang string: 源语言代码，若为空将由 API 自动检测。
+//	targetLang string: 目标语言代码，必填。
+//	videoType string: 视频语气标签（预留扩展）。
+//	apiKey string: Google Cloud API Key。
+//	endpoint string: 可选自定义端点，空字符串使用默认 URL。
+//
+// 返回值说明:
+//
+//	string: 翻译后的文本。
+//	error: 请求失败或解析错误时返回。
+//
+// 错误处理说明:
+//   - HTTP 401/403 表示密钥无效，429 表示配额不足，400 表示语言对不受支持，5xx 表示供应商故障。
+//   - JSON 解析失败时，将携带响应体以便调试。
+//
+// 注意事项:
+//   - API 有长度限制，超长文本需调用方拆分处理。
+//   - 建议调用方结合重试与熔断策略应对配额限制。
 func (g *GoogleTranslationAdapter) Translate(text, sourceLang, targetLang, videoType, apiKey, endpoint string) (string, error) {
 	log.Printf("[GoogleTranslationAdapter] Starting translation: source=%s, target=%s, video_type=%s", sourceLang, targetLang, videoType)
 
@@ -138,7 +205,24 @@ func (g *GoogleTranslationAdapter) Translate(text, sourceLang, targetLang, video
 	return translatedText, nil
 }
 
-// sendTranslateRequest 发送翻译 HTTP 请求
+// sendTranslateRequest 向 Google Translation API 发送请求并解析响应。
+//
+// 功能说明:
+//   - 构造 HTTP POST 请求、校验状态码并解码响应为 GoogleTranslateResponse。
+//
+// 参数说明:
+//
+//	endpoint string: API 端点。
+//	requestJSON []byte: 序列化后的请求体。
+//	apiKey string: Google Cloud API Key。
+//
+// 返回值说明:
+//
+//	*GoogleTranslateResponse: 成功时的翻译结果容器。
+//	error: 网络请求失败或响应异常时返回。
+//
+// 注意事项:
+//   - 429、401/403、400 与 5xx 等状态码会转化为带响应体的错误。
 func (g *GoogleTranslationAdapter) sendTranslateRequest(endpoint string, requestJSON []byte, apiKey string) (*GoogleTranslateResponse, error) {
 	// 创建 HTTP 请求
 	req, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(requestJSON))
@@ -189,8 +273,13 @@ func (g *GoogleTranslationAdapter) sendTranslateRequest(endpoint string, request
 	return &translateResponse, nil
 }
 
-// normalizeLanguageCode 标准化语言代码为 BCP-47 格式
-// 例如：zh → zh-CN, en → en-US
+// normalizeLanguageCode 将语言代码标准化为 BCP-47 格式，便于与 Google API 对齐。
+//
+// 功能说明:
+//   - 针对常见简写进行转换，其余语言保持原状。
+//
+// 注意事项:
+//   - 后续如需支持更多地区，可在此扩展映射表。
 func normalizeLanguageCode(langCode string) string {
 	switch langCode {
 	case "zh":
@@ -214,12 +303,12 @@ func normalizeLanguageCode(langCode string) string {
 	}
 }
 
-// contains 检查字符串是否包含子串
+// contains 检查字符串是否包含子串，兼容简单前后缀匹配场景。
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && (s[:len(substr)] == substr || s[len(s)-len(substr):] == substr || containsSubstring(s, substr)))
 }
 
-// containsSubstring 辅助函数：检查字符串是否包含子串
+// containsSubstring 辅助 contains 做逐字符匹配。
 func containsSubstring(s, substr string) bool {
 	for i := 0; i <= len(s)-len(substr); i++ {
 		if s[i:i+len(substr)] == substr {

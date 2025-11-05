@@ -10,13 +10,17 @@ import (
 	pb "video-in-chinese/ai_adaptor/proto"
 )
 
-// CloneVoiceLogic 声音克隆服务逻辑
+// CloneVoiceLogic orchestrates voice cloning requests by combining
+// configuration management with adapter resolution. It keeps the voice cloning
+// workflow isolated from transport handlers so providers can be swapped with
+// minimal surface area.
 type CloneVoiceLogic struct {
 	registry      *adapters.AdapterRegistry
 	configManager *config.ConfigManager
 }
 
-// NewCloneVoiceLogic 创建新的声音克隆服务逻辑实例
+// NewCloneVoiceLogic builds a CloneVoiceLogic instance using the shared adapter
+// registry and configuration manager.
 func NewCloneVoiceLogic(registry *adapters.AdapterRegistry, configManager *config.ConfigManager) *CloneVoiceLogic {
 	return &CloneVoiceLogic{
 		registry:      registry,
@@ -24,12 +28,39 @@ func NewCloneVoiceLogic(registry *adapters.AdapterRegistry, configManager *confi
 	}
 }
 
-// ProcessCloneVoice 处理声音克隆请求
-// 步骤：
-//  1. 从 Redis 读取声音克隆适配器配置（使用 ConfigManager）
-//  2. 从适配器注册表获取对应的声音克隆适配器实例
-//  3. 调用适配器的 CloneVoice 方法执行声音克隆
-//  4. 处理错误并返回音频文件路径
+// ProcessCloneVoice manages an end-to-end voice cloning workflow.
+//
+// Workflow:
+//  1. Validate required request fields.
+//  2. Load cloning provider credentials from ConfigManager (Redis + cache).
+//  3. Resolve the matching voice-cloning adapter via AdapterRegistry.
+//  4. Invoke CloneVoice on the adapter and return the generated audio path.
+//
+// Parameters:
+//   - ctx: Propagates cancellation and deadlines to the adapter invocation.
+//   - req: Protobuf payload with speaker metadata, reference audio, and text.
+//
+// Returns:
+//   - *pb.CloneVoiceResponse on success.
+//   - error for validation issues, configuration lookup problems, missing
+//     adapters, or provider execution errors.
+//
+// Design considerations:
+//   - AdapterRegistry decouples provider-specific behaviour so adding vendors
+//     remains a registry operation.
+//   - Errors are wrapped to preserve root causes for observability.
+//
+// Example:
+//
+//	res, err := l.ProcessCloneVoice(ctx, &pb.CloneVoiceRequest{
+//		SpeakerId:       "speaker-001",
+//		Text:            "示例台词",
+//		ReferenceAudio:  "oss://bucket/reference.wav",
+//	})
+//	if err != nil {
+//		return err
+//	}
+//	log.Println(res.AudioPath)
 func (l *CloneVoiceLogic) ProcessCloneVoice(ctx context.Context, req *pb.CloneVoiceRequest) (*pb.CloneVoiceResponse, error) {
 	log.Printf("[CloneVoiceLogic] Processing clone voice request: speaker_id=%s, text_length=%d",
 		req.SpeakerId, len(req.Text))
@@ -88,4 +119,3 @@ func (l *CloneVoiceLogic) ProcessCloneVoice(ctx context.Context, req *pb.CloneVo
 		AudioPath: audioPath,
 	}, nil
 }
-

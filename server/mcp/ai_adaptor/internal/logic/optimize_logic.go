@@ -10,13 +10,18 @@ import (
 	pb "video-in-chinese/ai_adaptor/proto"
 )
 
-// OptimizeLogic 译文优化服务逻辑
+// OptimizeLogic orchestrates translation optimization flows by combining
+// ConfigManager lookups with LLM adapter resolution. Keeping the orchestration
+// in a thin logic layer allows transport code to stay simple while new
+// providers can be registered without changing handlers.
 type OptimizeLogic struct {
 	registry      *adapters.AdapterRegistry
 	configManager *config.ConfigManager
 }
 
-// NewOptimizeLogic 创建新的译文优化服务逻辑实例
+// NewOptimizeLogic returns an OptimizeLogic bound to the shared adapter
+// registry and configuration manager. Callers should reuse the instance so
+// ConfigManager's Redis + in-memory cache stays warm across requests.
 func NewOptimizeLogic(registry *adapters.AdapterRegistry, configManager *config.ConfigManager) *OptimizeLogic {
 	return &OptimizeLogic{
 		registry:      registry,
@@ -24,13 +29,34 @@ func NewOptimizeLogic(registry *adapters.AdapterRegistry, configManager *config.
 	}
 }
 
-// ProcessOptimize 处理译文优化请求
-// 步骤：
-//  1. 从 Redis 读取 LLM 适配器配置（使用 ConfigManager）
-//  2. 检查译文优化是否启用
-//  3. 从适配器注册表获取对应的 LLM 适配器实例
-//  4. 调用适配器的 Optimize 方法执行译文优化
-//  5. 处理错误并返回优化结果
+// ProcessOptimize validates an optimization request, fetches provider settings
+// from ConfigManager, resolves the correct LLM adapter, and delegates the
+// Optimize call. It also honours the OptimizationEnabled toggle so rollbacks do
+// not require code changes.
+//
+// Workflow:
+//  1. Ensure the request supplies non-empty text.
+//  2. Load optimization configuration (provider, API key, endpoint, toggle)
+//     from ConfigManager which caches Redis results.
+//  3. Short-circuit with the original text if optimization is disabled.
+//  4. Resolve the adapter from AdapterRegistry and invoke Optimize.
+//
+// Parameters:
+//   - ctx: Carries deadlines/cancellation to the adapter execution.
+//   - req: Protobuf payload describing the text to optimize.
+//
+// Returns:
+//   - *pb.OptimizeResponse with the optimized text on success.
+//   - error describing validation issues, configuration lookup failures,
+//     registry misses, or adapter execution errors.
+//
+// Example:
+//
+//	res, err := l.ProcessOptimize(ctx, &pb.OptimizeRequest{Text: "稿件"})
+//	if err != nil {
+//		return err
+//	}
+//	log.Println(res.OptimizedText)
 func (l *OptimizeLogic) ProcessOptimize(ctx context.Context, req *pb.OptimizeRequest) (*pb.OptimizeResponse, error) {
 	log.Printf("[OptimizeLogic] Processing optimize request: text_length=%d", len(req.Text))
 
@@ -88,4 +114,3 @@ func (l *OptimizeLogic) ProcessOptimize(ctx context.Context, req *pb.OptimizeReq
 		OptimizedText: optimizedText,
 	}, nil
 }
-
