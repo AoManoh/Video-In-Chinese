@@ -46,8 +46,8 @@ httpClient.interceptors.response.use(
   (error: AxiosError<APIError>) => {
     if (axios.isAxiosError(error)) {
       const status = error.response?.status
-      const errorData = error.response?.data
-      const message = errorData?.message || '请求失败'
+      const errorData: any = error.response?.data
+      const message = (errorData?.message ?? errorData?.msg ?? '请求失败')
 
       // 根据后端错误码映射（Gateway-design.md 第8章）
       switch (status) {

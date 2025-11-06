@@ -50,12 +50,10 @@ const API_KEY_FORMAT_RULES: Record<string, KeyFormatRule> = {
   // 阿里云系列
   'aliyun-asr': {
     minLength: 16,
-    maxLength: 30,
     description: '阿里云 AccessKey ID 格式：16-30 个字符'
   },
   'aliyun-cosyvoice': {
     minLength: 16,
-    maxLength: 30,
     description: '阿里云 AccessKey ID 格式：16-30 个字符'
   },
 
@@ -234,6 +232,8 @@ export const validateRequiredConfig = (form: {
   translation_api_key?: string
   voice_cloning_provider?: string
   voice_cloning_api_key?: string
+  s2st_provider?: string
+  s2st_api_key?: string
 }): { valid: boolean; missing: string[] } => {
   const missing: string[] = []
 

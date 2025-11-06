@@ -58,7 +58,7 @@ npm run dev
 VITE_USE_MOCK=false
 
 # 指向真实后端地址
-VITE_API_BASE_URL=http://localhost:8080
+VITE_API_BASE_URL=/
 ```
 
 然后重新启动开发服务器：

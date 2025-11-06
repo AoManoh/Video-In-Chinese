@@ -1,8 +1,9 @@
-Name: task.rpc
-ListenOn: 0.0.0.0:50050
-Mode: dev
+RpcServerConf:
+  Name: task.rpc
+  ListenOn: 0.0.0.0:50050
+  Mode: dev
 
-Redis:
+TaskRedis:
   Host: 127.0.0.1:6379
   Type: node
   Pass: ""

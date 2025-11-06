@@ -41,12 +41,20 @@ npm run dev
 1. 修改 `.env.development` 文件：
 ```env
 VITE_USE_MOCK=false
-VITE_API_BASE_URL=http://localhost:8080
+VITE_API_BASE_URL=/
 ```
 
-2. 确保后端服务运行在 `http://localhost:8080`
+2. 启动 Gateway（建议使用 8081 以避免冲突），Vite 已将 `/v1/*` 代理到 `http://localhost:8081`
 
 3. 重启开发服务器
+
+> 启动命令（Windows）：
+>
+> ```powershell
+> cd server\app\gateway
+> .\gateway.exe -f .\etc\gateway-api.dev8081.yaml
+> ```
+
 
 ### 生产构建
 

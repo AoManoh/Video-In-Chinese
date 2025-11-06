@@ -49,10 +49,14 @@ func (c *Composer) AlignAudio(translatedAudioPath, originalAudioPath, outputPath
 	timeDiff := originalDuration - translatedDuration
 	logx.Infof("[Composer] Time difference: %v (original: %v, translated: %v)", timeDiff, originalDuration, translatedDuration)
 
-	// Check if durations are already aligned
+	// Check if durations are already aligned (within threshold)
 	if math.Abs(float64(timeDiff)) <= float64(SilencePaddingThreshold) {
-		// Use silence padding
-		return c.padSilence(translatedAudioPath, timeDiff, outputPath)
+		if timeDiff >= 0 {
+			// translated shorter: pad a little silence
+			return c.padSilence(translatedAudioPath, timeDiff, outputPath)
+		}
+		// translated slightly longer: keep as-is (no trimming) to avoid unnecessary failure
+		return c.copySingleSegment(translatedAudioPath, outputPath)
 	}
 
 	// Use speed adjustment

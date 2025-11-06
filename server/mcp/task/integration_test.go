@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	testredis "github.com/testcontainers/testcontainers-go/modules/redis"
 	"github.com/zeromicro/go-zero/core/stores/redis"
+	"github.com/zeromicro/go-zero/zrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
@@ -51,9 +52,14 @@ func setupIntegrationEnv(t *testing.T) *integrationEnv {
 
 	storageRoot := filepath.Join(t.TempDir(), "storage")
 	cfg := config.Config{
-		Redis: redis.RedisConf{
+		RpcServerConf: zrpc.RpcServerConf{
+			ListenOn: "127.0.0.1:0",
+			Mode:     "dev",
+		},
+		TaskRedis: redis.RedisConf{
 			Host: endpoint,
 			Type: "node",
+			Pass: "",
 		},
 		LocalStoragePath: storageRoot,
 	}

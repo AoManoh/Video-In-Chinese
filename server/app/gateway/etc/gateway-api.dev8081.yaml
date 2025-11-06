@@ -1,0 +1,36 @@
+Name: gateway-api-dev8081
+Host: 0.0.0.0
+Port: 8081
+MaxBytes: 2147483648
+
+# Redis configuration
+Redis:
+  Host: 127.0.0.1:6379
+  Type: node
+  Pass: ""
+
+# Task service gRPC configuration
+TaskRpcConf:
+  Endpoints:
+    - 127.0.0.1:50050
+  NonBlock: true
+
+# File storage configuration
+TempStoragePath: ./data/temp
+LocalStoragePath: ./data/videos
+
+# Upload configuration
+MaxUploadSizeMB: 2048
+SupportedMimeTypes:
+  - video/mp4
+  - video/quicktime
+  - video/x-matroska
+  - video/x-msvideo
+
+# API Key encryption configuration
+ApiKeyEncryptionSecret: "0123456789abcdefghijklmnopqrstuv"
+
+# HTTP configuration
+HttpTimeoutSeconds: 300
+MaxConcurrentConnections: 100
+

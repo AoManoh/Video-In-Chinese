@@ -69,55 +69,45 @@ func (l *GetSettingsLogic) GetSettings() (resp *types.GetSettingsResponse, err e
 		}
 	}
 
-	// Step 4: Mask API Keys (prefix-***-last6)
-	maskedSettings := make(map[string]string)
-	for key, value := range decryptedSettings {
-		if len(key) > 8 && key[len(key)-8:] == "_api_key" && value != "" {
-			maskedSettings[key] = utils.MaskAPIKey(value)
-		} else {
-			maskedSettings[key] = value
-		}
-	}
-
-	// Step 5: Determine IsConfigured status
+	// Step 4: Determine IsConfigured status
 	// Check if at least ASR, Translation, VoiceCloning API Keys are configured
-	isConfigured := maskedSettings["asr_api_key"] != "" &&
-		maskedSettings["translation_api_key"] != "" &&
-		maskedSettings["voice_cloning_api_key"] != ""
+	isConfigured := decryptedSettings["asr_api_key"] != "" &&
+		decryptedSettings["translation_api_key"] != "" &&
+		decryptedSettings["voice_cloning_api_key"] != ""
 
-	// Step 6: Construct and return response
-	version, _ := strconv.ParseInt(maskedSettings["version"], 10, 64)
-	audioSeparationEnabled, _ := strconv.ParseBool(maskedSettings["audio_separation_enabled"])
-	polishingEnabled, _ := strconv.ParseBool(maskedSettings["polishing_enabled"])
-	optimizationEnabled, _ := strconv.ParseBool(maskedSettings["optimization_enabled"])
-	voiceCloningAutoSelectReference, _ := strconv.ParseBool(maskedSettings["voice_cloning_auto_select_reference"])
+	// Step 5: Construct and return response
+	version, _ := strconv.ParseInt(decryptedSettings["version"], 10, 64)
+	audioSeparationEnabled, _ := strconv.ParseBool(decryptedSettings["audio_separation_enabled"])
+	polishingEnabled, _ := strconv.ParseBool(decryptedSettings["polishing_enabled"])
+	optimizationEnabled, _ := strconv.ParseBool(decryptedSettings["optimization_enabled"])
+	voiceCloningAutoSelectReference, _ := strconv.ParseBool(decryptedSettings["voice_cloning_auto_select_reference"])
 
 	resp = &types.GetSettingsResponse{
 		Version:                         version,
 		IsConfigured:                    isConfigured,
-		ProcessingMode:                  maskedSettings["processing_mode"],
-		AsrProvider:                     maskedSettings["asr_provider"],
-		AsrApiKey:                       maskedSettings["asr_api_key"],
-		AsrEndpoint:                     maskedSettings["asr_endpoint"],
+		ProcessingMode:                  decryptedSettings["processing_mode"],
+		AsrProvider:                     decryptedSettings["asr_provider"],
+		AsrApiKey:                       decryptedSettings["asr_api_key"],
+		AsrEndpoint:                     decryptedSettings["asr_endpoint"],
 		AudioSeparationEnabled:          audioSeparationEnabled,
 		PolishingEnabled:                polishingEnabled,
-		PolishingProvider:               maskedSettings["polishing_provider"],
-		PolishingApiKey:                 maskedSettings["polishing_api_key"],
-		PolishingCustomPrompt:           maskedSettings["polishing_custom_prompt"],
-		PolishingVideoType:              maskedSettings["polishing_video_type"],
-		TranslationProvider:             maskedSettings["translation_provider"],
-		TranslationApiKey:               maskedSettings["translation_api_key"],
-		TranslationEndpoint:             maskedSettings["translation_endpoint"],
-		TranslationVideoType:            maskedSettings["translation_video_type"],
+		PolishingProvider:               decryptedSettings["polishing_provider"],
+		PolishingApiKey:                 decryptedSettings["polishing_api_key"],
+		PolishingCustomPrompt:           decryptedSettings["polishing_custom_prompt"],
+		PolishingVideoType:              decryptedSettings["polishing_video_type"],
+		TranslationProvider:             decryptedSettings["translation_provider"],
+		TranslationApiKey:               decryptedSettings["translation_api_key"],
+		TranslationEndpoint:             decryptedSettings["translation_endpoint"],
+		TranslationVideoType:            decryptedSettings["translation_video_type"],
 		OptimizationEnabled:             optimizationEnabled,
-		OptimizationProvider:            maskedSettings["optimization_provider"],
-		OptimizationApiKey:              maskedSettings["optimization_api_key"],
-		VoiceCloningProvider:            maskedSettings["voice_cloning_provider"],
-		VoiceCloningApiKey:              maskedSettings["voice_cloning_api_key"],
-		VoiceCloningEndpoint:            maskedSettings["voice_cloning_endpoint"],
+		OptimizationProvider:            decryptedSettings["optimization_provider"],
+		OptimizationApiKey:              decryptedSettings["optimization_api_key"],
+		VoiceCloningProvider:            decryptedSettings["voice_cloning_provider"],
+		VoiceCloningApiKey:              decryptedSettings["voice_cloning_api_key"],
+		VoiceCloningEndpoint:            decryptedSettings["voice_cloning_endpoint"],
 		VoiceCloningAutoSelectReference: voiceCloningAutoSelectReference,
-		S2stProvider:                    maskedSettings["s2st_provider"],
-		S2stApiKey:                      maskedSettings["s2st_api_key"],
+		S2stProvider:                    decryptedSettings["s2st_provider"],
+		S2stApiKey:                      decryptedSettings["s2st_api_key"],
 	}
 
 	l.Infof("[GetSettings] Successfully retrieved settings, version=%d, isConfigured=%v", version, isConfigured)

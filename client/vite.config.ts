@@ -12,6 +12,14 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-    open: true
+    open: true,
+    proxy: {
+      '/v1': {
+        target: 'http://localhost:8081',
+        changeOrigin: true,
+        timeout: 300000,
+        proxyTimeout: 300000
+      }
+    }
   }
 })

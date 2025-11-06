@@ -1,4 +1,4 @@
-﻿package logic
+package logic
 
 import (
 	"context"
@@ -89,13 +89,13 @@ func executeWorkflow(ctx context.Context, svcCtx *svc.ServiceContext, task *Task
 	}
 	// Feature toggles
 	audioSeparationEnabled := getBool("audio_separation_enabled", false)
-	textPolishEnabled := getBool("text_polish_enabled", false)
-	translationOptimizeEnabled := getBool("translation_optimize_enabled", false)
+	textPolishEnabled := getBool("polishing_enabled", false)
+	translationOptimizeEnabled := getBool("optimization_enabled", false)
 	// Workflow parameters
 	sourceLang := getStr("source_lang", "en")
 	targetLang := getStr("target_lang", "zh")
-	videoType := getStr("video_type", "general")
-	customPrompt := getStr("polish_custom_prompt", "")
+	videoType := getStr("translation_video_type", "general")
+	customPrompt := getStr("polishing_custom_prompt", "")
 
 	// Ensure intermediate directory exists
 	if err := svcCtx.PathManager.EnsureIntermediateDir(taskID); err != nil {
@@ -112,7 +112,7 @@ func executeWorkflow(ctx context.Context, svcCtx *svc.ServiceContext, task *Task
 	// Step 3: (Optional) Separate audio into vocals and background
 	var vocalsPath, backgroundPath string
 
-	if audioSeparationEnabled {
+	if audioSeparationEnabled && svcCtx.AudioSeparatorClient != nil {
 		logx.Infof("[ProcessTask] Step 3: Separating audio (vocals + background)")
 
 		// Call AudioSeparator gRPC service
@@ -133,6 +133,10 @@ func executeWorkflow(ctx context.Context, svcCtx *svc.ServiceContext, task *Task
 
 		vocalsPath = resp.VocalsPath
 		backgroundPath = resp.AccompanimentPath
+	} else if audioSeparationEnabled {
+		logx.Infof("[ProcessTask] Audio separation enabled but client unavailable; skipping separation")
+		vocalsPath = originalAudioPath
+		backgroundPath = ""
 	} else {
 		logx.Infof("[ProcessTask] Step 3: Skipping audio separation (disabled)")
 		vocalsPath = originalAudioPath

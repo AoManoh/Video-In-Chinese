@@ -1,18 +1,12 @@
 package config
 
 import (
+	"github.com/zeromicro/go-zero/core/stores/redis"
 	"github.com/zeromicro/go-zero/zrpc"
 )
 
 type Config struct {
-	zrpc.RpcServerConf
-
-	// Redis configuration for task storage
-	Redis struct {
-		Host string
-		Type string
-		Pass string
-	}
-
-	LocalStoragePath string
+	RpcServerConf    zrpc.RpcServerConf `json:"RpcServerConf" yaml:"RpcServerConf"`
+	TaskRedis        redis.RedisConf    `json:"TaskRedis" yaml:"TaskRedis"`
+	LocalStoragePath string             `json:"LocalStoragePath" yaml:"LocalStoragePath"`
 }

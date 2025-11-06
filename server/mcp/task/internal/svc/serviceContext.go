@@ -16,9 +16,9 @@ type ServiceContext struct {
 func NewServiceContext(c config.Config) *ServiceContext {
 	// 初始化 Redis 客户端
 	redisClient, err := storage.NewRedisClient(storage.RedisConfig{
-		Host: c.Redis.Host,
-		Type: c.Redis.Type,
-		Pass: c.Redis.Pass,
+		Host: c.TaskRedis.Host,
+		Type: c.TaskRedis.Type,
+		Pass: c.TaskRedis.Pass,
 	})
 	if err != nil {
 		log.Fatalf("Failed to initialize Redis client: %v", err)

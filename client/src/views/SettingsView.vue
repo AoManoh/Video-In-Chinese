@@ -67,6 +67,9 @@
               placeholder="至少10个字符"
               show-password
             />
+          <el-text type="info" size="small" class="field-hint">
+            当前展示为脱敏后的密钥，如需更新请重新输入完整密钥
+          </el-text>
           </el-form-item>
 
           <el-form-item label="自定义端点">
@@ -114,6 +117,9 @@
               placeholder="至少10个字符"
               show-password
             />
+          <el-text type="info" size="small" class="field-hint">
+            当前展示为脱敏后的密钥，如需更新请重新输入完整密钥
+          </el-text>
           </el-form-item>
 
           <el-form-item label="自定义端点">
@@ -167,6 +173,9 @@
               placeholder="至少10个字符"
               show-password
             />
+          <el-text type="info" size="small" class="field-hint">
+            当前展示为脱敏后的密钥，如需更新请重新输入完整密钥
+          </el-text>
           </el-form-item>
 
           <el-form-item label="自定义端点">
@@ -239,6 +248,9 @@
                 show-password
                 size="small"
               />
+            <el-text type="info" size="small" class="field-hint">
+              当前展示为脱敏后的密钥，如需更新请重新输入完整密钥
+            </el-text>
             </el-form-item>
             <el-form-item label="自定义端点" label-width="120px" v-if="form.polishing_provider === 'openai-compatible' || form.polishing_provider === 'openai-gpt4o'">
               <el-input
@@ -276,6 +288,9 @@
                 show-password
                 size="small"
               />
+            <el-text type="info" size="small" class="field-hint">
+              当前展示为脱敏后的密钥，如需更新请重新输入完整密钥
+            </el-text>
             </el-form-item>
             <el-form-item label="自定义端点" label-width="120px" v-if="form.optimization_provider === 'openai-compatible' || form.optimization_provider === 'openai-gpt4o'">
               <el-input
@@ -312,7 +327,8 @@ import {
   validateEndpointFormat,
   validateRequiredConfig,
   getProviderConfigTips,
-  getConfigErrorSuggestion
+  getConfigErrorSuggestion,
+  validateConfiguration
 } from '@/utils/validation'
 import axios from 'axios'
 
@@ -327,7 +343,9 @@ const form = ref<Partial<UpdateSettingsRequest>>({
   audio_separation_enabled: false,
   polishing_enabled: false,
   optimization_enabled: false,
-  voice_cloning_auto_select_reference: true
+  voice_cloning_auto_select_reference: true,
+  s2st_provider: '',
+  s2st_api_key: ''
 })
 
 // 当前版本号
@@ -389,6 +407,8 @@ const loadSettings = async () => {
       optimization_provider: settings.value.optimization_provider || '',
       optimization_api_key: settings.value.optimization_api_key || '',
       optimization_endpoint: settings.value.optimization_endpoint || '',
+      s2st_provider: settings.value.s2st_provider || '',
+      s2st_api_key: settings.value.s2st_api_key || '',
       voice_cloning_provider: settings.value.voice_cloning_provider,
       voice_cloning_api_key: settings.value.voice_cloning_api_key,
       voice_cloning_endpoint: settings.value.voice_cloning_endpoint || '',
@@ -604,5 +624,11 @@ onMounted(() => {
 
 .mb-20 {
   margin-bottom: 20px;
+}
+
+.field-hint {
+  display: block;
+  margin-top: 6px;
+  color: #909399;
 }
 </style>

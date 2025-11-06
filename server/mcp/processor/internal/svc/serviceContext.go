@@ -66,10 +66,18 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	aiAdaptorClient := pb.NewAIAdaptorClient(aiAdaptorRpcClient.Conn())
 	logx.Infof("[ServiceContext] Connected to AIAdaptor at %v", c.AIAdaptorRpcConf.Endpoints)
 
-	// Initialize AudioSeparator gRPC client (using GoZero zrpc)
-	audioSeparatorRpcClient := zrpc.MustNewClient(c.AudioSeparatorRpcConf)
-	audioSeparatorClient := pb.NewAudioSeparatorClient(audioSeparatorRpcClient.Conn())
-	logx.Infof("[ServiceContext] Connected to AudioSeparator at %v", c.AudioSeparatorRpcConf.Endpoints)
+	var audioSeparatorClient pb.AudioSeparatorClient
+	if len(c.AudioSeparatorRpcConf.Endpoints) > 0 || len(c.AudioSeparatorRpcConf.Target) > 0 || len(c.AudioSeparatorRpcConf.Etcd.Hosts) > 0 {
+		audioSeparatorRpcClient, err := zrpc.NewClient(c.AudioSeparatorRpcConf)
+		if err != nil {
+			logx.Infof("[ServiceContext] AudioSeparator unavailable, disabling separation: %v", err)
+		} else {
+			audioSeparatorClient = pb.NewAudioSeparatorClient(audioSeparatorRpcClient.Conn())
+			logx.Infof("[ServiceContext] Connected to AudioSeparator at %v", c.AudioSeparatorRpcConf.Endpoints)
+		}
+	} else {
+		logx.Infof("[ServiceContext] AudioSeparator RPC not configured; skipping client initialization")
+	}
 
 	return &ServiceContext{
 		Config:               c,
