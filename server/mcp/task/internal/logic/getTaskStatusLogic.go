@@ -6,8 +6,8 @@ import (
 
 	"github.com/zeromicro/go-zero/core/logx"
 
-	"video-in-chinese/server/mcp/task-gozero/internal/svc"
-	"video-in-chinese/server/mcp/task-gozero/proto"
+	"video-in-chinese/server/mcp/task/internal/svc"
+	"video-in-chinese/server/mcp/task/proto"
 )
 
 // GetTaskStatusLogic encapsulates the business logic for task status queries.

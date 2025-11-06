@@ -17,6 +17,7 @@ package storage
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/zeromicro/go-zero/core/logx"
@@ -43,7 +44,7 @@ type RedisClient struct {
 // 以下钩子用于测试场景中注入故障或自定义行为。
 var (
 	setTaskFieldsHook func(ctx context.Context, taskID string, fields map[string]interface{}) error
-	pushTaskHook      func(ctx context.Context, taskID string) error
+	pushTaskHook      func(ctx context.Context, taskID, originalFilePath string) error
 	getTaskFieldsHook func(ctx context.Context, taskID string) error
 )
 
@@ -52,8 +53,8 @@ func SetSetTaskFieldsHook(hook func(ctx context.Context, taskID string, fields m
 	setTaskFieldsHook = hook
 }
 
-// SetPushTaskHook 设置测试钩子，在实际执行 LPUSH 之前触发。
-func SetPushTaskHook(hook func(ctx context.Context, taskID string) error) {
+// SetPushTaskHook 设置测试钩子，在实际执行队列写入之前触发。
+func SetPushTaskHook(hook func(ctx context.Context, taskID, originalFilePath string) error) {
 	pushTaskHook = hook
 }
 
@@ -67,6 +68,13 @@ func ResetTestHooks() {
 	setTaskFieldsHook = nil
 	pushTaskHook = nil
 	getTaskFieldsHook = nil
+}
+
+// RedisConfig defines the Redis configuration structure.
+type RedisConfig struct {
+	Host string
+	Type string
+	Pass string
 }
 
 // NewRedisClient creates a new Redis client instance using go-zero's redis.Redis.
@@ -83,10 +91,17 @@ func ResetTestHooks() {
 //   - Prometheus metrics integration
 //
 // Parameters:
-//   - redisConf: go-zero Redis configuration (from config.Redis)
+//   - redisConfig: Redis configuration (from config.Redis)
 //
 // Returns an error if connection to Redis fails.
-func NewRedisClient(redisConf redis.RedisConf) (*RedisClient, error) {
+func NewRedisClient(redisConfig RedisConfig) (*RedisClient, error) {
+	// 转换为 go-zero RedisConf
+	redisConf := redis.RedisConf{
+		Host: redisConfig.Host,
+		Type: redisConfig.Type,
+		Pass: redisConfig.Pass,
+	}
+
 	// 创建 go-zero Redis 客户端
 	client := redis.MustNewRedis(redisConf)
 
@@ -113,35 +128,62 @@ func NewRedisClientWithOptions(redisConf redis.RedisConf, skipPing bool) (*Redis
 	return &RedisClient{client: client}, nil
 }
 
-// PushTask pushes a task ID to the pending task queue.
+// TaskQueueMessage represents the message structure pushed to the task queue.
+// This must match the structure expected by Processor service.
+type TaskQueueMessage struct {
+	TaskID           string `json:"task_id"`
+	OriginalFilePath string `json:"original_file_path"`
+}
+
+// PushTask pushes a task message to the pending task queue in JSON format.
 //
 // Queue Design:
 //   - Key: "task:pending"
-//   - Operation: LPUSH (push to head, FIFO with RPOP)
-//   - Consumer: Processor service uses RPOP to pull tasks
+//   - Operation: RPUSH (append to tail for FIFO semantics)
+//   - Message Format: JSON with task_id and original_file_path
+//   - Consumer: Processor service pops from the head to maintain order
 //
 // Why LPUSH?
 //   - LPUSH + RPOP provides FIFO (First-In-First-Out) semantics
 //   - Tasks are processed in the order they are created
 //   - Processor service can use blocking BRPOP for efficient polling
 //
+// Why JSON Format?
+//   - Processor needs both task_id and original_file_path to start processing
+//   - JSON provides structured data that's easy to parse and extend
+//   - Matches the TaskMessage structure in Processor service
+//
 // Parameters:
 //   - ctx: Context for timeout and cancellation
 //   - taskID: UUID v4 string identifying the task
+//   - originalFilePath: Path to the original video file
 //
 // Returns an error if the Redis operation fails.
-func (r *RedisClient) PushTask(ctx context.Context, taskID string) error {
+func (r *RedisClient) PushTask(ctx context.Context, taskID, originalFilePath string) error {
 	if pushTaskHook != nil {
-		if err := pushTaskHook(ctx, taskID); err != nil {
+		if err := pushTaskHook(ctx, taskID, originalFilePath); err != nil {
 			return err
 		}
 	}
 
-	_, err := r.client.LpushCtx(ctx, "task:pending", taskID)
+	// Create task queue message
+	message := TaskQueueMessage{
+		TaskID:           taskID,
+		OriginalFilePath: originalFilePath,
+	}
+
+	// Marshal to JSON
+	messageJSON, err := json.Marshal(message)
+	if err != nil {
+		return fmt.Errorf("failed to marshal task message: %v", err)
+	}
+
+	// Push to queue
+	_, err = r.client.RpushCtx(ctx, "task:pending", string(messageJSON))
 	if err != nil {
 		return fmt.Errorf("failed to push task to queue: %v", err)
 	}
-	logx.WithContext(ctx).Infof("[RedisClient] Task pushed to queue: %s", taskID)
+	logx.WithContext(ctx).Infof("[RedisClient] Task pushed to queue: %s (path: %s)", taskID, originalFilePath)
 	return nil
 }
 

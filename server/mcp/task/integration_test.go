@@ -15,10 +15,10 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"video-in-chinese/server/mcp/task-gozero/internal/config"
-	"video-in-chinese/server/mcp/task-gozero/internal/server"
-	"video-in-chinese/server/mcp/task-gozero/internal/svc"
-	"video-in-chinese/server/mcp/task-gozero/proto"
+	"video-in-chinese/server/mcp/task/internal/config"
+	"video-in-chinese/server/mcp/task/internal/server"
+	"video-in-chinese/server/mcp/task/internal/svc"
+	"video-in-chinese/server/mcp/task/proto"
 )
 
 type integrationEnv struct {

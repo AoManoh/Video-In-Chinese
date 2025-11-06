@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/core/stores/redis"
@@ -28,14 +29,14 @@ func NewRedisClient(client *redis.Redis) *RedisClient {
 	}
 }
 
-// PopTask pops a task ID from the pending queue (LPOP).
+// PopTask pops a JSON task message string from the pending queue (LPOP).
 //
 // Parameters:
 //   - ctx: context for cancellation
 //   - queueKey: Redis queue key (e.g., "task:pending")
 //
 // Returns:
-//   - taskID: task ID string, empty if queue is empty
+//   - string: raw JSON of TaskMessage {task_id, original_file_path}; empty if queue is empty
 //   - error: error if Redis operation fails
 func (r *RedisClient) PopTask(ctx context.Context, queueKey string) (string, error) {
 	taskID, err := r.client.Lpop(queueKey)
@@ -115,8 +116,11 @@ func (r *RedisClient) SetTaskFields(ctx context.Context, taskID string, fields m
 func (r *RedisClient) UpdateTaskStatus(ctx context.Context, taskID, status string) error {
 	key := fmt.Sprintf("task:%s", taskID)
 
-	err := r.client.Hset(key, "status", status)
-	if err != nil {
+	fields := map[string]string{
+		"status":     status,
+		"updated_at": time.Now().Format(time.RFC3339),
+	}
+	if err := r.client.HmsetCtx(ctx, key, fields); err != nil {
 		logx.Errorf("[RedisClient] Failed to update task status for %s: %v", taskID, err)
 		return fmt.Errorf("failed to update task status: %w", err)
 	}
@@ -137,8 +141,11 @@ func (r *RedisClient) UpdateTaskStatus(ctx context.Context, taskID, status strin
 func (r *RedisClient) UpdateTaskError(ctx context.Context, taskID, errorMsg string) error {
 	key := fmt.Sprintf("task:%s", taskID)
 
-	err := r.client.Hset(key, "error", errorMsg)
-	if err != nil {
+	fields := map[string]string{
+		"error_message": errorMsg,
+		"updated_at":    time.Now().Format(time.RFC3339),
+	}
+	if err := r.client.HmsetCtx(ctx, key, fields); err != nil {
 		logx.Errorf("[RedisClient] Failed to update task error for %s: %v", taskID, err)
 		return fmt.Errorf("failed to update task error: %w", err)
 	}

@@ -30,31 +30,53 @@ def check_python_version():
 def check_system_dependencies():
     """
     验证系统依赖
-    
+
     要求:
     - ffmpeg: 音频格式转换
     - libsndfile1: 音频文件读写
     """
     import subprocess
-    
+    import os
+
     # 检查 ffmpeg
     try:
-        result = subprocess.run(
-            ['ffmpeg', '-version'],
-            capture_output=True,
-            text=True,
-            timeout=5
-        )
-        if result.returncode == 0:
-            version_line = result.stdout.split('\n')[0]
-            logging.info(f"ffmpeg check passed: {version_line}")
-        else:
-            logging.warning("ffmpeg check failed: command returned non-zero exit code")
-    except FileNotFoundError:
-        logging.error("ffmpeg not found. Please install ffmpeg.")
-        sys.exit(1)
+        # 尝试使用绝对路径（Windows）
+        ffmpeg_paths = [
+            'ffmpeg',  # 尝试从 PATH
+            r'C:\Environment\ffmpeg-8.0-essentials_build\bin\ffmpeg.exe',  # 常见安装位置
+            r'C:\Windows\System32\ffmpeg.exe',  # Windows System32
+        ]
+
+        ffmpeg_found = False
+        for ffmpeg_cmd in ffmpeg_paths:
+            try:
+                result = subprocess.run(
+                    [ffmpeg_cmd, '-version'],
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                if result.returncode == 0:
+                    version_line = result.stdout.split('\n')[0]
+                    logging.info(f"ffmpeg check passed: {version_line} (using {ffmpeg_cmd})")
+                    ffmpeg_found = True
+                    # 将 ffmpeg 路径添加到环境变量，供后续使用
+                    if os.path.dirname(ffmpeg_cmd):
+                        ffmpeg_dir = os.path.dirname(ffmpeg_cmd)
+                        if ffmpeg_dir not in os.environ.get('PATH', ''):
+                            os.environ['PATH'] = ffmpeg_dir + os.pathsep + os.environ.get('PATH', '')
+                            logging.info(f"Added {ffmpeg_dir} to PATH")
+                    break
+            except FileNotFoundError:
+                continue
+
+        if not ffmpeg_found:
+            logging.error("ffmpeg not found in any expected location. Please install ffmpeg.")
+            sys.exit(1)
+
     except Exception as e:
-        logging.warning(f"ffmpeg check failed: {str(e)}")
+        logging.error(f"ffmpeg check failed with exception: {type(e).__name__}: {str(e)}")
+        sys.exit(1)
     
     # 检查 libsndfile1（通过尝试导入 soundfile）
     try:

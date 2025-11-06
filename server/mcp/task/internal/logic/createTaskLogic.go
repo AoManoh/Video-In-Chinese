@@ -21,8 +21,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/zeromicro/go-zero/core/logx"
 
-	"video-in-chinese/server/mcp/task-gozero/internal/svc"
-	"video-in-chinese/server/mcp/task-gozero/proto"
+	"video-in-chinese/server/mcp/task/internal/svc"
+	"video-in-chinese/server/mcp/task/proto"
 )
 
 // CreateTaskLogic encapsulates the business logic for task creation.
@@ -129,7 +129,7 @@ func (l *CreateTaskLogic) CreateTask(in *proto.CreateTaskRequest) (*proto.Create
 	l.Infof("[CreateTask] Task record created in Redis: %s", taskID)
 
 	// 步骤6: 推入任务到队列（Redis LPUSH）
-	if err := l.svcCtx.RedisClient.PushTask(l.ctx, taskID); err != nil {
+	if err := l.svcCtx.RedisClient.PushTask(l.ctx, taskID, originalFilePath); err != nil {
 		l.Errorf("[CreateTask] Failed to push task to queue: %v", err)
 		return nil, fmt.Errorf("failed to push task to queue: %v", err)
 	}

@@ -12,8 +12,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"video-in-chinese/server/mcp/task-gozero/internal/storage"
-	"video-in-chinese/server/mcp/task-gozero/proto"
+	"video-in-chinese/server/mcp/task/internal/storage"
+	"video-in-chinese/server/mcp/task/proto"
 )
 
 // cleanupHooks 在测试前后重置 Redis 钩子，防止交叉污染。
@@ -110,7 +110,7 @@ func TestCreateTaskLogic_RedisSetFailed(t *testing.T) {
 
 func TestCreateTaskLogic_RedisPushFailed(t *testing.T) {
 	defer cleanupHooks(t)()
-	storage.SetPushTaskHook(func(ctx context.Context, taskID string) error {
+	storage.SetPushTaskHook(func(ctx context.Context, taskID, originalFilePath string) error {
 		return assert.AnError
 	})
 

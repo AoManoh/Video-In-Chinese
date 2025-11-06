@@ -26,7 +26,7 @@ SupportedMimeTypes:
   - video/x-msvideo
 
 # API Key encryption configuration
-ApiKeyEncryptionSecret: "change-this-to-32-byte-secret!!"
+ApiKeyEncryptionSecret: "741b79f9796835a806a3b2dc8085a4ffee548b6a87f8a22357ac8dd5382e2668"
 
 # HTTP configuration
 HttpTimeoutSeconds: 300

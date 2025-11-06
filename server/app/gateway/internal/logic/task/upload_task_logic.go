@@ -14,7 +14,7 @@ import (
 	"video-in-chinese/server/app/gateway/internal/svc"
 	"video-in-chinese/server/app/gateway/internal/types"
 	"video-in-chinese/server/app/gateway/internal/utils"
-	"video-in-chinese/server/mcp/task-gozero/proto"
+	"video-in-chinese/server/mcp/task/proto"
 
 	"github.com/google/uuid"
 	"github.com/zeromicro/go-zero/core/logx"

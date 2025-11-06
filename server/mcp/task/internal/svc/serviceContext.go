@@ -3,8 +3,8 @@ package svc
 import (
 	"log"
 
-	"video-in-chinese/server/mcp/task-gozero/internal/config"
-	"video-in-chinese/server/mcp/task-gozero/internal/storage"
+	"video-in-chinese/server/mcp/task/internal/config"
+	"video-in-chinese/server/mcp/task/internal/storage"
 )
 
 type ServiceContext struct {
@@ -15,7 +15,11 @@ type ServiceContext struct {
 
 func NewServiceContext(c config.Config) *ServiceContext {
 	// 初始化 Redis 客户端
-	redisClient, err := storage.NewRedisClient(c.Redis)
+	redisClient, err := storage.NewRedisClient(storage.RedisConfig{
+		Host: c.Redis.Host,
+		Type: c.Redis.Type,
+		Pass: c.Redis.Pass,
+	})
 	if err != nil {
 		log.Fatalf("Failed to initialize Redis client: %v", err)
 	}

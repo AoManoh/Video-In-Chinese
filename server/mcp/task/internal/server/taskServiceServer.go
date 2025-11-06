@@ -7,9 +7,9 @@ package server
 import (
 	"context"
 
-	"video-in-chinese/server/mcp/task-gozero/internal/logic"
-	"video-in-chinese/server/mcp/task-gozero/internal/svc"
-	"video-in-chinese/server/mcp/task-gozero/proto"
+	"video-in-chinese/server/mcp/task/internal/logic"
+	"video-in-chinese/server/mcp/task/internal/svc"
+	"video-in-chinese/server/mcp/task/proto"
 )
 
 type TaskServiceServer struct {

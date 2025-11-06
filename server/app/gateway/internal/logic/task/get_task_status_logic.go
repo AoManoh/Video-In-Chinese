@@ -10,7 +10,7 @@ import (
 
 	"video-in-chinese/server/app/gateway/internal/svc"
 	"video-in-chinese/server/app/gateway/internal/types"
-	"video-in-chinese/server/mcp/task-gozero/proto"
+	"video-in-chinese/server/mcp/task/proto"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )

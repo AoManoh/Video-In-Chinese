@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	
+
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
@@ -57,9 +57,9 @@ func (p *PathManager) GetIntermediateDir(taskID string) string {
 //   - taskID: task ID
 //
 // Returns:
-//   - string: video file path (e.g., "./data/videos/{taskID}/video.mp4")
+//   - string: video file path (e.g., "./data/videos/{taskID}/original.mp4")
 func (p *PathManager) GetVideoPath(taskID string) string {
-	return filepath.Join(p.baseDir, taskID, "video.mp4")
+	return filepath.Join(p.baseDir, taskID, "original.mp4")
 }
 
 // GetIntermediatePath returns an intermediate file path.
@@ -80,9 +80,9 @@ func (p *PathManager) GetIntermediatePath(taskID, filename string) string {
 //   - taskID: task ID
 //
 // Returns:
-//   - string: output video path (e.g., "./data/videos/{taskID}/output.mp4")
+//   - string: output video path (e.g., "./data/videos/{taskID}/result.mp4")
 func (p *PathManager) GetOutputPath(taskID string) string {
-	return filepath.Join(p.baseDir, taskID, "output.mp4")
+	return filepath.Join(p.baseDir, taskID, "result.mp4")
 }
 
 // EnsureIntermediateDir creates the intermediate directory if it doesn't exist.
@@ -94,13 +94,13 @@ func (p *PathManager) GetOutputPath(taskID string) string {
 //   - error: error if directory creation fails
 func (p *PathManager) EnsureIntermediateDir(taskID string) error {
 	dir := p.GetIntermediateDir(taskID)
-	
+
 	err := os.MkdirAll(dir, 0755)
 	if err != nil {
 		logx.Errorf("[PathManager] Failed to create intermediate directory %s: %v", dir, err)
 		return fmt.Errorf("failed to create intermediate directory: %w", err)
 	}
-	
+
 	logx.Infof("[PathManager] Created intermediate directory: %s", dir)
 	return nil
 }
@@ -114,14 +114,13 @@ func (p *PathManager) EnsureIntermediateDir(taskID string) error {
 //   - error: error if cleanup fails
 func (p *PathManager) CleanupIntermediateFiles(taskID string) error {
 	dir := p.GetIntermediateDir(taskID)
-	
+
 	err := os.RemoveAll(dir)
 	if err != nil {
 		logx.Errorf("[PathManager] Failed to cleanup intermediate files %s: %v", dir, err)
 		return fmt.Errorf("failed to cleanup intermediate files: %w", err)
 	}
-	
+
 	logx.Infof("[PathManager] Cleaned up intermediate files: %s", dir)
 	return nil
 }
-

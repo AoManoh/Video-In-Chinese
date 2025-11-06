@@ -8,9 +8,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"video-in-chinese/server/mcp/task-gozero/internal/storage"
-	"video-in-chinese/server/mcp/task-gozero/internal/svc"
-	"video-in-chinese/server/mcp/task-gozero/proto"
+	"video-in-chinese/server/mcp/task/internal/storage"
+	"video-in-chinese/server/mcp/task/internal/svc"
+	"video-in-chinese/server/mcp/task/proto"
 )
 
 func setupTaskForStatusTests(t *testing.T) (*proto.CreateTaskResponse, *svc.ServiceContext, func()) {

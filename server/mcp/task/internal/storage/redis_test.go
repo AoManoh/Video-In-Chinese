@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	testredis "github.com/testcontainers/testcontainers-go/modules/redis"
-	"github.com/zeromicro/go-zero/core/stores/redis"
 )
 
 func setupRedisClient(t *testing.T) (*RedisClient, func()) {
@@ -21,7 +20,7 @@ func setupRedisClient(t *testing.T) (*RedisClient, func()) {
 	endpoint, err := redisContainer.Endpoint(ctx, "")
 	require.NoError(t, err)
 
-	client, err := NewRedisClient(redis.RedisConf{Host: endpoint, Type: "node"})
+	client, err := NewRedisClient(RedisConfig{Host: endpoint, Type: "node"})
 	require.NoError(t, err)
 
 	cleanup := func() {

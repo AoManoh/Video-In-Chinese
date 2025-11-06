@@ -4,10 +4,10 @@ import (
 	"flag"
 	"fmt"
 
-	"video-in-chinese/server/mcp/task-gozero/internal/config"
-	"video-in-chinese/server/mcp/task-gozero/internal/server"
-	"video-in-chinese/server/mcp/task-gozero/internal/svc"
-	"video-in-chinese/server/mcp/task-gozero/proto"
+	"video-in-chinese/server/mcp/task/internal/config"
+	"video-in-chinese/server/mcp/task/internal/server"
+	"video-in-chinese/server/mcp/task/internal/svc"
+	"video-in-chinese/server/mcp/task/proto"
 
 	"github.com/zeromicro/go-zero/core/conf"
 	"github.com/zeromicro/go-zero/core/service"

@@ -763,11 +763,11 @@ redis.Setex(key, value, ttl)
 
 - **Base-Design.md v2.2**: `notes/server/1st/Base-Design.md`
 - **AIAdaptor-design-detail.md**: `notes/server/3rd/AIAdaptor-design-detail.md`
-- **Task 服务 GoZero 重构日志**: `server/mcp/task-gozero/GOZERO_REFACTORING_LOG.md`
+- **Task 服务 GoZero 重构日志**: `server/mcp/task/GOZERO_REFACTORING_LOG.md`
 
 ### 7.3 示例代码
 
-- **Task 服务 GoZero 实现**: `server/mcp/task-gozero/`
+- **Task 服务 GoZero 实现**: `server/mcp/task/`
 - **原 AIAdaptor 实现**: `server/mcp/ai_adaptor-backup/`
 
 ---

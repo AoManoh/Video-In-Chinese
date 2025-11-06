@@ -5,7 +5,7 @@ package svc
 
 import (
 	"video-in-chinese/server/app/gateway/internal/config"
-	"video-in-chinese/server/mcp/task-gozero/proto"
+	"video-in-chinese/server/mcp/task/proto"
 
 	"github.com/zeromicro/go-zero/core/stores/redis"
 	"github.com/zeromicro/go-zero/zrpc"

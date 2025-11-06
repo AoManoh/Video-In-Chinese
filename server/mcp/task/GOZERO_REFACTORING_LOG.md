@@ -130,7 +130,7 @@ option go_package = "./proto";
 ### 项目结构
 
 ```
-server/mcp/task-gozero/
+server/mcp/task/
 ├── etc/
 │   └── task.yaml (Redis + LocalStoragePath 配置)
 ├── internal/
@@ -237,7 +237,7 @@ server/mcp/task-gozero/
 ## Phase 4.5: 清理和验收 - [ ] 待开始
 
 ### 任务清单
-- [ ] 替换旧实现 (重命名 task-gozero 为 task)
+- [x] 替换旧实现 (重命名 task-gozero 为 task)
 - [ ] 最终质量检查 (go mod tidy, gofmt, go vet, go test, go build)
 - [ ] 更新 development-todo.md 记录重构过程
 - [ ] 生成最终完成报告

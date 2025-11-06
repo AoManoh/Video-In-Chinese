@@ -143,9 +143,9 @@
 **依赖**: Redis
 **参考文档**: `AIAdaptor-design-detail.md` v2.0
 
-**路径/依赖说明（2025-11-05）**:
-- 代码 import 路径已统一为 `video-in-chinese/server/mcp/ai_adaptor/...`，所有依赖由仓库根 `go.mod` 管理。
-- `server/mcp/ai_adaptor` 目录的独立 go.mod 将在后续迁移步骤中移除，执行模块相关命令时请切换到仓库根目录。
+**路径/依赖说明（2025-11-06）**:
+- 代码 import 路径统一为 `video-in-chinese/server/mcp/ai_adaptor/...`，所有依赖由仓库根 `go.mod` 管理。
+- 子目录 `server/mcp/ai_adaptor` 的独立 go.mod/go.sum 已移除，后续开发请始终在仓库根目录执行 Go 命令。
 
 ### Phase 1: 基础设施搭建 ✅ 开发完成
 
@@ -1070,7 +1070,13 @@ notes/server/test/
 ### 2025-11-05 (深夜更新 14 - AIAdaptor 模块路径合并)
 
 - ✅ 将 AIAdaptor 相关 import 路径统一为 `video-in-chinese/server/mcp/ai_adaptor/...`，为合并至根 go.mod 做准备
-- ⚙️ 后续任务：安全移除 `server/mcp/ai_adaptor/go.mod` 并在根模块补齐依赖锁定
+- ⚙️ 后续任务：安全移除 `server/mcp/ai_adaptor/go.mod` 并在根模块补齐依赖锁定（已于 2025-11-06 完成）
+
+### 2025-11-06 (深夜更新 16 - AIAdaptor 依赖迁移)
+
+- ✅ 移除 `server/mcp/ai_adaptor/go.mod` 与 `go.sum`，AIAdaptor 依赖完全由根模块托管
+- ✅ 根 `go.mod` 新增 `github.com/aliyun/aliyun-oss-go-sdk` 依赖，确保 OSS 工具可编译
+- ⚙️ 后续任务：执行 `go mod tidy`、`go test ./...` 验证依赖一致性（待统一完成）
 
 ### 2025-11-05 (深夜更新 13 - Gateway Phase 6 完成)
 
@@ -1082,6 +1088,39 @@ notes/server/test/
 - 📊 Phase 6 统计：3个任务完成，4个任务暂缓
 - 🚀 准备开始 Processor 服务开发
 - 📊 总体进度: 143/282 任务完成 (51%)
+
+### 2025-11-06 (深夜更新 17 - Processor Phase 4 完成)
+
+- ✅ 完成 Processor 服务 Phase 4: 主流程编排（18步处理流程）
+  - 实现任务拉取循环（internal/logic/task_pull_loop.go，108行）
+    - 定期轮询 Redis 队列（每5秒检查一次）
+    - 使用 Channel 信号量控制并发（最大并发数可配置）
+    - 非阻塞式获取 worker 槽位
+    - 启动新 Goroutine 处理任务
+  - 实现18步处理流程（internal/logic/process_task.go，319行）
+    - 步骤1：更新任务状态为 PROCESSING
+    - 步骤2：音频提取（从视频中提取音频）
+    - 步骤3：音频分离（可选，分离人声和背景音）
+    - 步骤4：ASR（语音识别，返回 Speakers 列表）
+    - 步骤5：音频片段切分（根据 ASR 时间戳切分音频）
+    - 步骤6：文本润色（可选）
+    - 步骤7：翻译（调用 AIAdaptor.Translate）
+    - 步骤8：译文优化（可选）
+    - 步骤9：声音克隆（调用 AIAdaptor.CloneVoice）
+    - 步骤10：音频拼接（按时间轴顺序拼接）
+    - 步骤11：时长对齐（静音填充 + 语速加速）
+    - 步骤12：音频合并（人声 + 背景音）
+    - 步骤13：视频合成（合并视频和新音轨）
+    - 步骤14：保存结果（更新 Redis 任务字段）
+    - 步骤15：更新任务状态为 COMPLETED
+    - 步骤16：异常处理（快速失败 + 状态更新）
+    - 步骤17：Panic 恢复（使用 defer recover）
+    - 步骤18：资源清理（释放 worker 槽位）
+  - 编译验证通过 ✅
+  - 静态检查通过 ✅
+- 📊 Phase 4 统计：2个文件，约 427 行代码
+- 🚀 准备开始 Processor 服务 Phase 5（并发控制和错误处理）
+- 📊 总体进度: 202/282 任务完成 (72%)
 
 ### 2025-11-06 (深夜更新 16 - Processor Phase 3 完成)
 

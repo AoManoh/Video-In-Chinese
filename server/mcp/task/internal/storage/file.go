@@ -12,8 +12,8 @@ import (
 // FileStorage encapsulates file operations for video storage.
 //
 // Directory Structure:
-//   - {baseDir}/videos/{taskID}/original.mp4 (original video)
-//   - {baseDir}/videos/{taskID}/result.mp4 (translated video, created by Processor)
+//   - {baseDir}/{taskID}/original.mp4 (original video)
+//   - {baseDir}/{taskID}/result.mp4 (translated video, created by Processor)
 //
 // Design Decisions:
 //   - Each task has its own directory to isolate files and simplify cleanup
@@ -55,19 +55,19 @@ func NewFileStorage(baseDir string) (*FileStorage, error) {
 
 // GetTaskDir returns the directory path for a task.
 //
-// Path Format: {baseDir}/videos/{taskID}/
+// Path Format: {baseDir}/{taskID}/
 //
 // This directory contains all files related to the task:
 //   - original.mp4: Original video uploaded by the user
 //   - result.mp4: Translated video (created by Processor service)
 //   - Intermediate files (audio, subtitles, etc., created by Processor)
 func (fs *FileStorage) GetTaskDir(taskID string) string {
-	return filepath.Join(fs.baseDir, "videos", taskID)
+	return filepath.Join(fs.baseDir, taskID)
 }
 
 // GetOriginalFilePath returns the path to the original video file.
 //
-// Path Format: {baseDir}/videos/{taskID}/original.mp4
+// Path Format: {baseDir}/{taskID}/original.mp4
 //
 // This file is created by the CreateTask operation when the temporary
 // file is moved to its permanent location.
@@ -209,4 +209,3 @@ func (fs *FileStorage) DeleteTaskDir(taskID string) error {
 	logx.Infof("[FileStorage] Task directory deleted: %s", taskDir)
 	return nil
 }
-

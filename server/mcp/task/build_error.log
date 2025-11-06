@@ -1,0 +1,15 @@
+﻿go : # video-in-chinese/server/mcp/task/internal/svc
+所在位置 行:1 字符: 1
++ go build -o task_test.exe . 2>&1 | Out-File -Encodi
+ng UTF8 build_erro ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (# video 
+   -in-chin...sk/internal/svc:String) [], RemoteExc  
+  eption
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+internal\svc\serviceContext.go:18:45: cannot use c.Re
+dis (variable of struct type "github.com/zeromicro/go
+-zero/core/stores/redis".RedisKeyConf) as "video-in-c
+hinese/server/mcp/task/internal/storage".RedisConfig 
+value in argument to storage.NewRedisClient

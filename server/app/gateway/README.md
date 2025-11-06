@@ -214,7 +214,7 @@ go run gateway.go -f etc/gateway-api.yaml
 ### 2. Task 服务
 - 用途: 任务管理（创建任务、查询状态）
 - 端口: 50050
-- 启动命令: `cd server/mcp/task-gozero && go run main.go`
+- 启动命令: `cd server/mcp/task && go run task.go`
 
 ## 开发规范
 

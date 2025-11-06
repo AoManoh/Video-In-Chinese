@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
-	"path/filepath"
 	"strconv"
 	"time"
 
@@ -69,6 +68,35 @@ func executeWorkflow(ctx context.Context, svcCtx *svc.ServiceContext, task *Task
 	taskID := task.TaskID
 	originalVideoPath := task.OriginalFilePath
 
+	// Load app settings (from Redis) and derive runtime flags/params
+	settings, err := svcCtx.RedisClient.GetAppSettings(ctx)
+	if err != nil {
+		logx.Infof("[ProcessTask] App settings unavailable, using defaults: %v", err)
+	}
+	getBool := func(key string, def bool) bool {
+		if v, ok := settings[key]; ok {
+			if b, err := strconv.ParseBool(v); err == nil {
+				return b
+			}
+		}
+		return def
+	}
+	getStr := func(key, def string) string {
+		if v, ok := settings[key]; ok && v != "" {
+			return v
+		}
+		return def
+	}
+	// Feature toggles
+	audioSeparationEnabled := getBool("audio_separation_enabled", false)
+	textPolishEnabled := getBool("text_polish_enabled", false)
+	translationOptimizeEnabled := getBool("translation_optimize_enabled", false)
+	// Workflow parameters
+	sourceLang := getStr("source_lang", "en")
+	targetLang := getStr("target_lang", "zh")
+	videoType := getStr("video_type", "general")
+	customPrompt := getStr("polish_custom_prompt", "")
+
 	// Ensure intermediate directory exists
 	if err := svcCtx.PathManager.EnsureIntermediateDir(taskID); err != nil {
 		return fmt.Errorf("failed to create intermediate directory: %w", err)
@@ -83,7 +111,6 @@ func executeWorkflow(ctx context.Context, svcCtx *svc.ServiceContext, task *Task
 
 	// Step 3: (Optional) Separate audio into vocals and background
 	var vocalsPath, backgroundPath string
-	audioSeparationEnabled := false // TODO: Read from app settings
 
 	if audioSeparationEnabled {
 		logx.Infof("[ProcessTask] Step 3: Separating audio (vocals + background)")
@@ -157,15 +184,14 @@ func executeWorkflow(ctx context.Context, svcCtx *svc.ServiceContext, task *Task
 	logx.Infof("[ProcessTask] Cut %d audio segments", len(allSegments))
 
 	// Step 5: (Optional) Polish text
-	textPolishEnabled := false // TODO: Read from app settings
 
 	if textPolishEnabled {
 		logx.Infof("[ProcessTask] Step 5: Polishing text")
 		for i := range allSegments {
 			polishReq := &pb.PolishRequest{
 				Text:         allSegments[i].Text,
-				VideoType:    "general", // TODO: Read from app settings
-				CustomPrompt: "",        // TODO: Read from app settings
+				VideoType:    videoType,
+				CustomPrompt: customPrompt,
 			}
 
 			polishResp, err := svcCtx.AIAdaptorClient.Polish(ctx, polishReq)
@@ -184,9 +210,9 @@ func executeWorkflow(ctx context.Context, svcCtx *svc.ServiceContext, task *Task
 	for i := range allSegments {
 		translateReq := &pb.TranslateRequest{
 			Text:       allSegments[i].Text,
-			SourceLang: "en", // TODO: Read from app settings
-			TargetLang: "zh",
-			VideoType:  "general", // TODO: Read from app settings
+			SourceLang: sourceLang,
+			TargetLang: targetLang,
+			VideoType:  videoType,
 		}
 
 		translateResp, err := svcCtx.AIAdaptorClient.Translate(ctx, translateReq)
@@ -198,7 +224,6 @@ func executeWorkflow(ctx context.Context, svcCtx *svc.ServiceContext, task *Task
 	}
 
 	// Step 7: (Optional) Optimize translation
-	translationOptimizeEnabled := false // TODO: Read from app settings
 
 	if translationOptimizeEnabled {
 		logx.Infof("[ProcessTask] Step 7: Optimizing translation")
@@ -284,11 +309,10 @@ func continueWorkflow(ctx context.Context, svcCtx *svc.ServiceContext, taskID, o
 
 	// Step 13: Save result
 	logx.Infof("[ProcessTask] Step 13: Saving result")
-	outputFileName := filepath.Base(outputVideoPath)
+
 	if err := svcCtx.RedisClient.SetTaskFields(ctx, taskID, map[string]interface{}{
-		"output_file_path": outputVideoPath,
-		"output_file_name": outputFileName,
-		"completed_at":     fmt.Sprintf("%d", time.Now().Unix()),
+		"result_file_path": outputVideoPath,
+		"updated_at":       time.Now().Format(time.RFC3339),
 	}); err != nil {
 		return fmt.Errorf("step 13 failed (save result): %w", err)
 	}

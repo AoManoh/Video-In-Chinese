@@ -176,7 +176,7 @@ docker --version
 **依赖安装**:
 
 ```bash
-cd server/mcp/task-gozero
+cd server/mcp/task
 go get github.com/testcontainers/testcontainers-go
 go get github.com/testcontainers/testcontainers-go/wait
 ```
@@ -310,7 +310,7 @@ func SetupTestRedis(t *testing.T) (*svc.ServiceContext, func()) {
 **步骤 1**: 创建测试文件
 
 ```bash
-cd server/mcp/task-gozero/internal/logic
+cd server/mcp/task/internal/logic
 touch createTaskLogic_test.go
 touch getTaskStatusLogic_test.go
 ```
@@ -451,7 +451,7 @@ func TestCreateTaskLogic_Success(t *testing.T) {
 }
 ```
 
-**迁移后的测试代码** (`task-gozero/internal/logic/createTaskLogic_test.go`):
+**迁移后的测试代码** (`task/internal/logic/createTaskLogic_test.go`):
 
 ```go
 package logic
@@ -525,7 +525,7 @@ func createTempFile(t *testing.T, baseDir string) string {
 
 ### 4.3 GetTaskStatus 测试迁移示例
 
-**迁移后的测试代码** (`task-gozero/internal/logic/getTaskStatusLogic_test.go`):
+**迁移后的测试代码** (`task/internal/logic/getTaskStatusLogic_test.go`):
 
 ```go
 package logic

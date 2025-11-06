@@ -1,0 +1,10 @@
+Name: task.rpc
+ListenOn: 0.0.0.0:50050
+Mode: dev
+
+Redis:
+  Host: 127.0.0.1:6379
+  Type: node
+  Pass: ""
+
+LocalStoragePath: ./data/videos
