@@ -36,3 +36,22 @@ scripts/test_api_calls.ps1
 scripts/test_api_manual.ps1
 scripts/test_api_manual.py
 scripts/verify_integration_test_env.ps1
+
+# 任务处理产生的临时文件和大文件
+**/data/
+server/data/
+data/
+
+# 临时日志文件
+tmp/
+*.log
+
+# 测试和临时文件
+step*.json
+test_audio*.wav
+*__2025-*.json
+
+# 不需要版本控制的目录和文件
+docs/
+scripts/
+package-lock.json
