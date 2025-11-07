@@ -2,6 +2,7 @@ package asr
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -74,37 +75,25 @@ func NewAliyunASRAdapter() *AliyunASRAdapter {
 	}
 }
 
-// AliyunASRRequest 表示阿里云 ASR API 的请求体，字段与官方协议保持一致。
+// AliyunASRRequest 表示阿里云 Paraformer-v2 API 的请求体（新版格式）
 //
-// 功能说明:
-//   - 配置音频来源、识别模式及输出选项。
-//
-// 设计决策:
-//   - 使用 json 标签匹配阿里云接口要求。
-//
-// 使用示例:
-//
-//	req := AliyunASRRequest{AppKey: apiKey, FileLink: url}
-//
-// 参数说明:
-//   - 不适用: 结构体字段由调用方赋值。
-//
-// 返回值说明:
-//   - 不适用。
-//
-// 错误处理说明:
-//   - 构造阶段不产生错误，序列化失败将由调用方捕获。
-//
-// 注意事项:
-//   - FileLink 需为阿里云可访问的 URL。
+// 参考文档：https://help.aliyun.com/zh/model-studio/paraformer-recorded-speech-recognition-restful-api
 type AliyunASRRequest struct {
-	AppKey            string `json:"appkey"`             // 应用 Key
-	FileLink          string `json:"file_link"`          // 音频文件 URL（OSS 公网地址）
-	Version           string `json:"version"`            // API 版本（默认 "4.0"）
-	EnableWords       bool   `json:"enable_words"`       // 是否返回词级别时间戳
-	EnableSpeaker     bool   `json:"enable_speaker"`     // 是否启用说话人分离
-	SpeakerCount      int    `json:"speaker_count"`      // 说话人数量（0 表示自动检测）
-	EnablePunctuation bool   `json:"enable_punctuation"` // 是否启用标点符号
+	Model      string              `json:"model"`      // 模型名称（paraformer-v2）
+	Input      AliyunASRInput      `json:"input"`      // 输入配置
+	Parameters AliyunASRParameters `json:"parameters"` // 识别参数
+}
+
+// AliyunASRInput 表示输入配置
+type AliyunASRInput struct {
+	FileURLs []string `json:"file_urls"` // 音频文件 URL 列表
+}
+
+// AliyunASRParameters 表示识别参数
+type AliyunASRParameters struct {
+	DiarizationEnabled bool     `json:"diarization_enabled"` // 是否启用说话人分离
+	SpeakerCount       int      `json:"speaker_count"`       // 说话人数量（2-100，0 表示自动检测）
+	LanguageHints      []string `json:"language_hints"`      // 语言提示（如 ["zh", "en"]）
 }
 
 // AliyunASRResponse 映射阿里云 ASR API 的响应结构。
@@ -211,15 +200,17 @@ func (a *AliyunASRAdapter) ASR(audioPath, apiKey, endpoint string) ([]*pb.Speake
 		return nil, fmt.Errorf("上传音频到 OSS 失败: %w", err)
 	}
 
-	// 步骤 3: 构建 API 请求
+	// 步骤 3: 构建 API 请求（Paraformer-v2 新版格式）
 	requestBody := AliyunASRRequest{
-		AppKey:            apiKey,
-		FileLink:          fileLink,
-		Version:           "4.0",
-		EnableWords:       false, // 不需要词级别时间戳
-		EnableSpeaker:     true,  // 启用说话人分离
-		SpeakerCount:      0,     // 自动检测说话人数量
-		EnablePunctuation: true,  // 启用标点符号
+		Model: "paraformer-v2",
+		Input: AliyunASRInput{
+			FileURLs: []string{fileLink},
+		},
+		Parameters: AliyunASRParameters{
+			DiarizationEnabled: true,                 // 启用说话人分离
+			SpeakerCount:       0,                    // 自动检测说话人数量
+			LanguageHints:      []string{"zh", "en"}, // 支持中英混合
+		},
 	}
 
 	// 步骤 4: 序列化请求体
@@ -232,38 +223,36 @@ func (a *AliyunASRAdapter) ASR(audioPath, apiKey, endpoint string) ([]*pb.Speake
 	apiEndpoint := endpoint
 	if apiEndpoint == "" {
 		// 使用默认端点（阿里云智能语音交互 - 录音文件识别）
-		apiEndpoint = "https://nls-gateway.cn-shanghai.aliyuncs.com/stream/v1/asr"
+		// 参考文档：https://help.aliyun.com/zh/model-studio/paraformer-recorded-speech-recognition-restful-api
+		apiEndpoint = "https://dashscope.aliyuncs.com/api/v1/services/audio/asr/transcription"
 	}
 
-	// 步骤 6: 发送 HTTP POST 请求（带重试逻辑）
-	var response *AliyunASRResponse
-	var lastErr error
-
-	for retryCount := 0; retryCount <= 3; retryCount++ {
-		if retryCount > 0 {
-			log.Printf("[AliyunASRAdapter] Retrying ASR request (attempt %d/3)", retryCount)
-			time.Sleep(2 * time.Second) // 重试间隔 2 秒
-		}
-
-		response, lastErr = a.sendASRRequest(apiEndpoint, requestJSON, apiKey)
-		if lastErr == nil {
-			break // 请求成功，退出重试循环
-		}
-
-		// 检查是否为不可重试的错误（401, 429）
-		if utils.IsNonRetryableError(lastErr) {
-			break
-		}
-	}
-
-	if lastErr != nil {
-		return nil, lastErr
-	}
-
-	// 步骤 7: 解析响应，转换为 Speaker 列表
-	speakers, err := a.parseASRResponse(response)
+	// 步骤 6: 提交异步任务
+	taskID, err := a.submitASRTask(apiEndpoint, requestJSON, apiKey)
 	if err != nil {
-		return nil, fmt.Errorf("解析 ASR 响应失败: %w", err)
+		return nil, fmt.Errorf("提交 ASR 任务失败: %w", err)
+	}
+
+	log.Printf("[AliyunASRAdapter] ASR task submitted: task_id=%s", taskID)
+
+	// 步骤 7: 轮询任务状态直到完成
+	transcriptionURL, err := a.waitForTaskCompletion(taskID, apiKey)
+	if err != nil {
+		return nil, fmt.Errorf("等待 ASR 任务完成失败: %w", err)
+	}
+
+	log.Printf("[AliyunASRAdapter] ASR task completed: transcription_url=%s", transcriptionURL)
+
+	// 步骤 8: 下载识别结果
+	response, err := a.downloadTranscriptionResult(transcriptionURL)
+	if err != nil {
+		return nil, fmt.Errorf("下载识别结果失败: %w", err)
+	}
+
+	// 步骤 9: 解析响应，转换为 Speaker 列表
+	speakers, err := a.parseTranscriptionResult(response)
+	if err != nil {
+		return nil, fmt.Errorf("解析识别结果失败: %w", err)
 	}
 
 	log.Printf("[AliyunASRAdapter] ASR completed successfully: %d speakers found", len(speakers))
@@ -439,7 +428,8 @@ func (a *AliyunASRAdapter) uploadToOSS(audioPath string) (string, error) {
 	objectKey := utils.GenerateObjectKey(audioPath, "asr-audio")
 
 	// 上传文件
-	publicURL, err := uploader.UploadFile(nil, audioPath, objectKey)
+	ctx := context.Background()
+	publicURL, err := uploader.UploadFile(ctx, audioPath, objectKey)
 	if err != nil {
 		return "", fmt.Errorf("上传文件到 OSS 失败: %w", err)
 	}
@@ -472,4 +462,222 @@ func containsSubstring(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+// AliyunASRTaskResponse 表示提交任务接口的响应
+type AliyunASRTaskResponse struct {
+	Output struct {
+		TaskStatus string `json:"task_status"` // 任务状态
+		TaskID     string `json:"task_id"`     // 任务 ID
+	} `json:"output"`
+	RequestID string `json:"request_id"` // 请求 ID
+}
+
+// AliyunASRTaskStatusResponse 表示查询任务接口的响应
+type AliyunASRTaskStatusResponse struct {
+	Output struct {
+		TaskID     string `json:"task_id"`     // 任务 ID
+		TaskStatus string `json:"task_status"` // 任务状态（PENDING, RUNNING, SUCCEEDED, FAILED）
+		Results    []struct {
+			FileURL          string `json:"file_url"`          // 文件 URL
+			TranscriptionURL string `json:"transcription_url"` // 识别结果 URL
+			SubtaskStatus    string `json:"subtask_status"`    // 子任务状态
+		} `json:"results"`
+	} `json:"output"`
+	RequestID string `json:"request_id"` // 请求 ID
+}
+
+// AliyunTranscriptionResult 表示识别结果 JSON 文件的结构
+type AliyunTranscriptionResult struct {
+	FileURL     string `json:"file_url"` // 文件 URL
+	Transcripts []struct {
+		ChannelID int `json:"channel_id"` // 音轨 ID
+		Sentences []struct {
+			BeginTime  int64  `json:"begin_time"`  // 开始时间（毫秒）
+			EndTime    int64  `json:"end_time"`    // 结束时间（毫秒）
+			Text       string `json:"text"`        // 句子文本
+			SentenceID int    `json:"sentence_id"` // 句子 ID
+			SpeakerID  int    `json:"speaker_id"`  // 说话人 ID（如果启用说话人分离）
+		} `json:"sentences"`
+	} `json:"transcripts"`
+}
+
+// submitASRTask 提交异步 ASR 任务
+func (a *AliyunASRAdapter) submitASRTask(endpoint string, requestJSON []byte, apiKey string) (string, error) {
+	// 创建 HTTP 请求
+	req, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(requestJSON))
+	if err != nil {
+		return "", fmt.Errorf("创建 HTTP 请求失败: %w", err)
+	}
+
+	// 设置请求头
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("X-DashScope-Async", "enable") // 异步模式
+
+	// 发送请求
+	resp, err := a.client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("发送 HTTP 请求失败: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// 读取响应体
+	responseBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("读取响应体失败: %w", err)
+	}
+
+	// 检查 HTTP 状态码
+	if resp.StatusCode != 200 {
+		return "", fmt.Errorf("HTTP 请求失败 (HTTP %d): %s", resp.StatusCode, string(responseBody))
+	}
+
+	// 解析 JSON 响应
+	var taskResponse AliyunASRTaskResponse
+	if err := json.Unmarshal(responseBody, &taskResponse); err != nil {
+		return "", fmt.Errorf("解析 JSON 响应失败: %w, 响应体: %s", err, string(responseBody))
+	}
+
+	return taskResponse.Output.TaskID, nil
+}
+
+// waitForTaskCompletion 轮询任务状态直到完成
+func (a *AliyunASRAdapter) waitForTaskCompletion(taskID, apiKey string) (string, error) {
+	queryURL := fmt.Sprintf("https://dashscope.aliyuncs.com/api/v1/tasks/%s", taskID)
+	maxRetries := 60 // 最多轮询 60 次
+	retryInterval := 2 * time.Second
+
+	for i := 0; i < maxRetries; i++ {
+		// 创建 HTTP 请求（官方文档要求使用 POST 方法）
+		req, err := http.NewRequest("POST", queryURL, nil)
+		if err != nil {
+			return "", fmt.Errorf("创建 HTTP 请求失败: %w", err)
+		}
+
+		// 设置请求头
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+
+		// 发送请求
+		resp, err := a.client.Do(req)
+		if err != nil {
+			return "", fmt.Errorf("发送 HTTP 请求失败: %w", err)
+		}
+
+		// 读取响应体
+		responseBody, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			return "", fmt.Errorf("读取响应体失败: %w", err)
+		}
+
+		// 检查 HTTP 状态码
+		if resp.StatusCode != 200 {
+			return "", fmt.Errorf("HTTP 请求失败 (HTTP %d): %s", resp.StatusCode, string(responseBody))
+		}
+
+		// 解析 JSON 响应
+		var statusResponse AliyunASRTaskStatusResponse
+		if err := json.Unmarshal(responseBody, &statusResponse); err != nil {
+			return "", fmt.Errorf("解析 JSON 响应失败: %w, 响应体: %s", err, string(responseBody))
+		}
+
+		// 检查任务状态
+		switch statusResponse.Output.TaskStatus {
+		case "SUCCEEDED":
+			// 任务成功，返回识别结果 URL
+			if len(statusResponse.Output.Results) == 0 {
+				return "", fmt.Errorf("任务成功但没有返回结果")
+			}
+			return statusResponse.Output.Results[0].TranscriptionURL, nil
+		case "FAILED":
+			// 记录详细的失败信息
+			log.Printf("[AliyunASRAdapter] ASR task failed. Full response: %s", string(responseBody))
+			return "", fmt.Errorf("ASR 任务失败，详细信息: %s", string(responseBody))
+		case "PENDING", "RUNNING":
+			// 任务进行中，继续轮询
+			log.Printf("[AliyunASRAdapter] Task status: %s, waiting...", statusResponse.Output.TaskStatus)
+			time.Sleep(retryInterval)
+		default:
+			return "", fmt.Errorf("未知的任务状态: %s", statusResponse.Output.TaskStatus)
+		}
+	}
+
+	return "", fmt.Errorf("任务超时：轮询次数超过 %d 次", maxRetries)
+}
+
+// downloadTranscriptionResult 下载识别结果
+func (a *AliyunASRAdapter) downloadTranscriptionResult(transcriptionURL string) (*AliyunTranscriptionResult, error) {
+	// 创建 HTTP 请求
+	req, err := http.NewRequest("GET", transcriptionURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("创建 HTTP 请求失败: %w", err)
+	}
+
+	// 发送请求
+	resp, err := a.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("发送 HTTP 请求失败: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// 读取响应体
+	responseBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("读取响应体失败: %w", err)
+	}
+
+	// 检查 HTTP 状态码
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("HTTP 请求失败 (HTTP %d): %s", resp.StatusCode, string(responseBody))
+	}
+
+	// 解析 JSON 响应
+	var result AliyunTranscriptionResult
+	if err := json.Unmarshal(responseBody, &result); err != nil {
+		return nil, fmt.Errorf("解析 JSON 响应失败: %w, 响应体: %s", err, string(responseBody))
+	}
+
+	return &result, nil
+}
+
+// parseTranscriptionResult 解析识别结果并转换为 pb.Speaker 列表
+func (a *AliyunASRAdapter) parseTranscriptionResult(result *AliyunTranscriptionResult) ([]*pb.Speaker, error) {
+	if len(result.Transcripts) == 0 {
+		return nil, fmt.Errorf("识别结果中没有转写内容")
+	}
+
+	// 按说话人 ID 分组句子
+	speakerMap := make(map[string][]*pb.Sentence)
+
+	for _, transcript := range result.Transcripts {
+		for _, sentence := range transcript.Sentences {
+			// 转换时间戳：毫秒 → 秒
+			startTime := float64(sentence.BeginTime) / 1000.0
+			endTime := float64(sentence.EndTime) / 1000.0
+
+			// 构建 Sentence 对象
+			pbSentence := &pb.Sentence{
+				Text:      sentence.Text,
+				StartTime: startTime,
+				EndTime:   endTime,
+			}
+
+			// 按说话人 ID 分组
+			speakerID := fmt.Sprintf("speaker_%d", sentence.SpeakerID)
+			speakerMap[speakerID] = append(speakerMap[speakerID], pbSentence)
+		}
+	}
+
+	// 转换为 Speaker 列表
+	var speakers []*pb.Speaker
+	for speakerID, sentences := range speakerMap {
+		speaker := &pb.Speaker{
+			SpeakerId: speakerID,
+			Sentences: sentences,
+		}
+		speakers = append(speakers, speaker)
+	}
+
+	return speakers, nil
 }

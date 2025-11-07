@@ -92,6 +92,9 @@ func initializeAdapters(registry *adapters.AdapterRegistry, voiceManager *voice_
 	registry.RegisterTranslation("google", translation.NewGoogleTranslationAdapter())
 	log.Println("✓ Registered translation adapter: google")
 
+	registry.RegisterTranslation("openai-compatible", translation.NewOpenAICompatibleTranslationAdapter())
+	log.Println("✓ Registered translation adapter: openai-compatible")
+
 	// 注册 LLM 适配器
 	registry.RegisterLLM("gemini", llm.NewGeminiLLMAdapter())
 	log.Println("✓ Registered LLM adapter: gemini")
@@ -100,8 +103,8 @@ func initializeAdapters(registry *adapters.AdapterRegistry, voiceManager *voice_
 	log.Println("✓ Registered LLM adapter: openai")
 
 	// 注册声音克隆适配器
-	registry.RegisterVoiceCloning("aliyun_cosyvoice", voice_cloning.NewAliyunCosyVoiceAdapter(voiceManager))
-	log.Println("✓ Registered voice cloning adapter: aliyun_cosyvoice")
+	registry.RegisterVoiceCloning("aliyun-cosyvoice", voice_cloning.NewAliyunCosyVoiceAdapter(voiceManager))
+	log.Println("✓ Registered voice cloning adapter: aliyun-cosyvoice")
 
 	log.Println("[initializeAdapters] All adapters registered successfully")
 }

@@ -566,9 +566,9 @@ func (m *ConfigManager) validateConfig(config *AppConfig) error {
 func isValidProvider(serviceType, provider string) bool {
 	validProviders := map[string][]string{
 		"asr":           {"aliyun", "azure", "google"},
-		"translation":   {"deepl", "google", "azure"},
-		"llm":           {"openai-gpt4o", "claude", "gemini"},
-		"voice_cloning": {"aliyun_cosyvoice"},
+		"translation":   {"deepl", "google", "azure", "openai-compatible"},
+		"llm":           {"openai-gpt4o", "claude", "gemini", "openai-compatible"},
+		"voice_cloning": {"aliyun-cosyvoice", "elevenlabs"},
 	}
 
 	providers, ok := validProviders[serviceType]

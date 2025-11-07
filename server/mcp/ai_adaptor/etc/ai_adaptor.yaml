@@ -1,0 +1,36 @@
+# AIAdaptor gRPC 服务配置
+Name: ai_adaptor.rpc
+ListenOn: 0.0.0.0:50053
+Mode: dev
+
+# Redis 配置
+Redis:
+  Host: 127.0.0.1:6379
+  Type: node
+  Pass: ""
+  DB: 0
+
+# API 密钥加密密钥（32 字节十六进制字符串，64 个字符）
+# 生成方法: openssl rand -hex 32
+ApiKeyEncryptionSecret: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+
+# 配置缓存配置
+ConfigCacheTTL: 600  # 配置缓存过期时间（秒，默认 10 分钟）
+
+# 音色管理配置
+VoiceCache:
+  TTL: 0                    # 音色缓存过期时间（秒，0 表示不过期）
+  RegisterTimeout: 60       # 音色注册超时时间（秒）
+  RegisterRetry: 3          # 音色注册失败重试次数
+  RegisterRetryInterval: 5  # 音色注册重试间隔（秒）
+
+# API 调用配置
+APICall:
+  Timeout: 30               # 外部 API 调用超时时间（秒）
+  Retry: 2                  # 外部 API 调用失败重试次数
+  RetryInterval: 2          # 外部 API 调用重试间隔（秒）
+
+# 日志配置
+Log:
+  Level: info               # 日志级别（debug, info, warn, error）
+
