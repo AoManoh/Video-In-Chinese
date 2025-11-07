@@ -8,4 +8,4 @@ TaskRedis:
   Type: node
   Pass: ""
 
-LocalStoragePath: ./data/videos
+LocalStoragePath: ../../data/videos

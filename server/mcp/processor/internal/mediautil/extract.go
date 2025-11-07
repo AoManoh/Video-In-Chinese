@@ -2,8 +2,7 @@ package mediautil
 
 import (
 	"fmt"
-	"os/exec"
-	
+
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
@@ -21,7 +20,7 @@ func ExtractAudio(videoPath, outputPath string) error {
 	// -acodec pcm_s16le: PCM 16-bit little-endian
 	// -ar 44100: sample rate 44.1kHz
 	// -ac 2: stereo (2 channels)
-	cmd := exec.Command("ffmpeg",
+	cmd := NewFFmpegCommand(
 		"-i", videoPath,
 		"-vn",
 		"-acodec", "pcm_s16le",
@@ -30,14 +29,13 @@ func ExtractAudio(videoPath, outputPath string) error {
 		"-y",
 		outputPath,
 	)
-	
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		logx.Errorf("[Mediautil] Failed to extract audio: %v, output: %s", err, string(output))
 		return fmt.Errorf("failed to extract audio: %w", err)
 	}
-	
+
 	logx.Infof("[Mediautil] Extracted audio from %s to %s", videoPath, outputPath)
 	return nil
 }
-

@@ -17,7 +17,7 @@ TaskRpcConf:
 
 # File storage configuration
 TempStoragePath: ./data/temp
-LocalStoragePath: ./data/videos
+LocalStoragePath: ../../data/videos
 
 # Upload configuration
 MaxUploadSizeMB: 2048
@@ -28,7 +28,7 @@ SupportedMimeTypes:
   - video/x-msvideo
 
 # API Key encryption configuration
-ApiKeyEncryptionSecret: "0123456789abcdefghijklmnopqrstuv"
+ApiKeyEncryptionSecret: "01234567890123456789012345678901"
 
 # HTTP configuration
 HttpTimeoutSeconds: 300

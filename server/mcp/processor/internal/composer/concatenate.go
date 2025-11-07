@@ -3,10 +3,11 @@ package composer
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
-	
+
+	"video-in-chinese/server/mcp/processor/internal/mediautil"
+
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
@@ -26,26 +27,26 @@ func (c *Composer) ConcatenateAudio(segments []AudioSegment, outputPath string) 
 		logx.Error("[Composer] No audio segments to concatenate")
 		return fmt.Errorf("no audio segments to concatenate")
 	}
-	
+
 	// Sort segments by start time
 	sort.Slice(segments, func(i, j int) bool {
 		return segments[i].StartTime < segments[j].StartTime
 	})
-	
+
 	logx.Infof("[Composer] Concatenating %d audio segments", len(segments))
-	
+
 	// If only one segment, copy it directly
 	if len(segments) == 1 {
 		return c.copySingleSegment(segments[0].FilePath, outputPath)
 	}
-	
+
 	// Create concat file list
 	concatFilePath, err := c.createConcatFile(segments)
 	if err != nil {
 		return err
 	}
 	defer os.Remove(concatFilePath)
-	
+
 	// Run ffmpeg concat
 	return c.runFFmpegConcat(concatFilePath, outputPath)
 }
@@ -60,19 +61,19 @@ func (c *Composer) ConcatenateAudio(segments []AudioSegment, outputPath string) 
 //   - error: error if copy fails
 func (c *Composer) copySingleSegment(inputPath, outputPath string) error {
 	// Use ffmpeg to copy (ensures format consistency)
-	cmd := exec.Command("ffmpeg",
+	cmd := mediautil.NewFFmpegCommand(
 		"-i", inputPath,
 		"-c", "copy",
 		"-y",
 		outputPath,
 	)
-	
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		logx.Errorf("[Composer] Failed to copy single segment: %v, output: %s", err, string(output))
 		return fmt.Errorf("failed to copy single segment: %w", err)
 	}
-	
+
 	logx.Infof("[Composer] Copied single segment to %s", outputPath)
 	return nil
 }
@@ -93,14 +94,14 @@ func (c *Composer) copySingleSegment(inputPath, outputPath string) error {
 func (c *Composer) createConcatFile(segments []AudioSegment) (string, error) {
 	// Create temp concat file
 	concatFilePath := filepath.Join(os.TempDir(), "concat_list.txt")
-	
+
 	file, err := os.Create(concatFilePath)
 	if err != nil {
 		logx.Errorf("[Composer] Failed to create concat file: %v", err)
 		return "", fmt.Errorf("failed to create concat file: %w", err)
 	}
 	defer file.Close()
-	
+
 	// Write file paths
 	for _, segment := range segments {
 		// Convert to absolute path
@@ -109,7 +110,7 @@ func (c *Composer) createConcatFile(segments []AudioSegment) (string, error) {
 			logx.Errorf("[Composer] Failed to get absolute path for %s: %v", segment.FilePath, err)
 			return "", fmt.Errorf("failed to get absolute path: %w", err)
 		}
-		
+
 		// Write to concat file (use single quotes to handle spaces)
 		_, err = fmt.Fprintf(file, "file '%s'\n", absPath)
 		if err != nil {
@@ -117,7 +118,7 @@ func (c *Composer) createConcatFile(segments []AudioSegment) (string, error) {
 			return "", fmt.Errorf("failed to write to concat file: %w", err)
 		}
 	}
-	
+
 	logx.Infof("[Composer] Created concat file: %s", concatFilePath)
 	return concatFilePath, nil
 }
@@ -132,7 +133,7 @@ func (c *Composer) createConcatFile(segments []AudioSegment) (string, error) {
 //   - error: error if ffmpeg fails
 func (c *Composer) runFFmpegConcat(concatFilePath, outputPath string) error {
 	// ffmpeg -f concat -safe 0 -i concat_list.txt -c copy output.wav
-	cmd := exec.Command("ffmpeg",
+	cmd := mediautil.NewFFmpegCommand(
 		"-f", "concat",
 		"-safe", "0",
 		"-i", concatFilePath,
@@ -140,14 +141,13 @@ func (c *Composer) runFFmpegConcat(concatFilePath, outputPath string) error {
 		"-y",
 		outputPath,
 	)
-	
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		logx.Errorf("[Composer] Failed to concatenate audio: %v, output: %s", err, string(output))
 		return fmt.Errorf("failed to concatenate audio: %w", err)
 	}
-	
+
 	logx.Infof("[Composer] Concatenated audio saved to %s", outputPath)
 	return nil
 }
-

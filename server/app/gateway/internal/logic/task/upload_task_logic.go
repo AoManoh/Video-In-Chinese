@@ -38,8 +38,10 @@ func NewUploadTaskLogic(ctx context.Context, svcCtx *svc.ServiceContext, r *http
 }
 
 func (l *UploadTaskLogic) UploadTask() (resp *types.UploadTaskResponse, err error) {
+	const maxMemory = 32 << 20 // 32 MB in-memory buffer; rest spills to disk
+
 	// Step 1: Parse multipart/form-data file stream and original filename
-	err = l.r.ParseMultipartForm(int64(l.svcCtx.Config.MaxUploadSizeMB) * 1024 * 1024)
+	err = l.r.ParseMultipartForm(maxMemory)
 	if err != nil {
 		l.Errorf("[UploadTask] Failed to parse multipart form: %v", err)
 		return nil, fmt.Errorf("failed to parse upload form")
@@ -50,7 +52,13 @@ func (l *UploadTaskLogic) UploadTask() (resp *types.UploadTaskResponse, err erro
 		l.Errorf("[UploadTask] Failed to get form file: %v", err)
 		return nil, fmt.Errorf("no file uploaded")
 	}
-	defer file.Close()
+	defer func() {
+		if file != nil {
+			if cerr := file.Close(); cerr != nil {
+				l.Errorf("[UploadTask] Failed to close form file: %v", cerr)
+			}
+		}
+	}()
 
 	originalFilename := header.Filename
 	fileSize := header.Size
@@ -58,25 +66,39 @@ func (l *UploadTaskLogic) UploadTask() (resp *types.UploadTaskResponse, err erro
 
 	// Step 2: Check file size (MAX_UPLOAD_SIZE_MB)
 	maxSizeBytes := int64(l.svcCtx.Config.MaxUploadSizeMB) * 1024 * 1024
-	if fileSize > maxSizeBytes {
-		l.Errorf("[UploadTask] File too large: %d bytes (max: %d bytes)", fileSize, maxSizeBytes)
+	if fileSize > 0 && int64(fileSize) > maxSizeBytes {
+		l.Errorf("[UploadTask] File too large (header): %d bytes (max: %d bytes)", fileSize, maxSizeBytes)
 		return nil, fmt.Errorf("file too large: max size is %d MB", l.svcCtx.Config.MaxUploadSizeMB)
 	}
 
 	// Step 3: Generate unique temporary filename (UUID + extension)
+	tempDir := l.svcCtx.Config.TempStoragePath
+	if !filepath.IsAbs(tempDir) {
+		if absDir, err := filepath.Abs(tempDir); err == nil {
+			tempDir = absDir
+		} else {
+			l.Errorf("[UploadTask] Failed to resolve temp directory: %v", err)
+			return nil, fmt.Errorf("internal error")
+		}
+	}
+
 	ext := filepath.Ext(originalFilename)
 	tempFilename := uuid.New().String() + ext
-	tempFilePath := filepath.Join(l.svcCtx.Config.TempStoragePath, tempFilename)
+	tempFilePath := filepath.Join(tempDir, tempFilename)
 
 	// Ensure temp directory exists
-	if err := os.MkdirAll(l.svcCtx.Config.TempStoragePath, 0755); err != nil {
+	if err := os.MkdirAll(tempDir, 0755); err != nil {
 		l.Errorf("[UploadTask] Failed to create temp directory: %v", err)
 		return nil, fmt.Errorf("internal error")
 	}
 
 	// Step 4: Check disk available space (fileSize * 3 + 500MB)
-	requiredSpace := fileSize*3 + 500*1024*1024
-	if err := utils.CheckDiskSpace(l.svcCtx.Config.TempStoragePath, requiredSpace); err != nil {
+	approxSize := int64(fileSize)
+	if approxSize <= 0 {
+		approxSize = maxSizeBytes
+	}
+	requiredSpace := approxSize*3 + 500*1024*1024
+	if err := utils.CheckDiskSpace(tempDir, requiredSpace); err != nil {
 		l.Errorf("[UploadTask] Insufficient disk space: %v", err)
 		return nil, fmt.Errorf("insufficient disk space")
 	}
@@ -87,7 +109,13 @@ func (l *UploadTaskLogic) UploadTask() (resp *types.UploadTaskResponse, err erro
 		l.Errorf("[UploadTask] Failed to create temp file: %v", err)
 		return nil, fmt.Errorf("internal error")
 	}
-	defer tempFile.Close()
+	defer func() {
+		if tempFile != nil {
+			if cerr := tempFile.Close(); cerr != nil {
+				l.Errorf("[UploadTask] Failed to close temp file: %v", cerr)
+			}
+		}
+	}()
 
 	// Step 6: Copy file content
 	written, err := io.Copy(tempFile, file)
@@ -96,7 +124,28 @@ func (l *UploadTaskLogic) UploadTask() (resp *types.UploadTaskResponse, err erro
 		os.Remove(tempFilePath) // Clean up on error
 		return nil, fmt.Errorf("failed to save file")
 	}
+	if written > maxSizeBytes {
+		l.Errorf("[UploadTask] File too large (written bytes): %d bytes (max: %d bytes)", written, maxSizeBytes)
+		os.Remove(tempFilePath)
+		return nil, fmt.Errorf("file too large: max size is %d MB", l.svcCtx.Config.MaxUploadSizeMB)
+	}
 	l.Infof("[UploadTask] File saved: %s, written: %d bytes", tempFilePath, written)
+
+	// Close upload stream early to release handle before invoking downstream services
+	if err := file.Close(); err != nil {
+		l.Errorf("[UploadTask] Failed to close upload stream: %v", err)
+		os.Remove(tempFilePath)
+		return nil, fmt.Errorf("internal error")
+	}
+	file = nil
+
+	// Ensure the temporary file handle is released before Task service accesses it
+	if err := tempFile.Close(); err != nil {
+		l.Errorf("[UploadTask] Failed to finalize temp file: %v", err)
+		os.Remove(tempFilePath)
+		return nil, fmt.Errorf("internal error")
+	}
+	tempFile = nil
 
 	// Step 7: Validate file MIME Type (whitelist)
 	mimeType, err := utils.DetectAndValidateMimeType(tempFilePath, l.svcCtx.Config.SupportedMimeTypes)

@@ -68,7 +68,7 @@
               show-password
             />
           <el-text type="info" size="small" class="field-hint">
-            当前展示为脱敏后的密钥，如需更新请重新输入完整密钥
+            保存后会显示完整密钥，请注意妥善保管，必要时可随时更新
           </el-text>
           </el-form-item>
 
@@ -118,7 +118,7 @@
               show-password
             />
           <el-text type="info" size="small" class="field-hint">
-            当前展示为脱敏后的密钥，如需更新请重新输入完整密钥
+            保存后会显示完整密钥，请注意妥善保管，必要时可随时更新
           </el-text>
           </el-form-item>
 
@@ -174,7 +174,7 @@
               show-password
             />
           <el-text type="info" size="small" class="field-hint">
-            当前展示为脱敏后的密钥，如需更新请重新输入完整密钥
+            保存后会显示完整密钥，请注意妥善保管，必要时可随时更新
           </el-text>
           </el-form-item>
 
@@ -249,7 +249,7 @@
                 size="small"
               />
             <el-text type="info" size="small" class="field-hint">
-              当前展示为脱敏后的密钥，如需更新请重新输入完整密钥
+              保存后会显示完整密钥，请注意妥善保管，必要时可随时更新
             </el-text>
             </el-form-item>
             <el-form-item label="自定义端点" label-width="120px" v-if="form.polishing_provider === 'openai-compatible' || form.polishing_provider === 'openai-gpt4o'">
@@ -289,7 +289,7 @@
                 size="small"
               />
             <el-text type="info" size="small" class="field-hint">
-              当前展示为脱敏后的密钥，如需更新请重新输入完整密钥
+              保存后会显示完整密钥，请注意妥善保管，必要时可随时更新
             </el-text>
             </el-form-item>
             <el-form-item label="自定义端点" label-width="120px" v-if="form.optimization_provider === 'openai-compatible' || form.optimization_provider === 'openai-gpt4o'">
@@ -359,20 +359,17 @@ const saving = ref(false)
 const validationRules: FormRules = {
   asr_provider: [{ required: true, message: '请选择ASR服务商', trigger: 'change' }],
   asr_api_key: [
-    { required: true, message: '请输入ASR API密钥', trigger: 'blur' },
-    { min: 10, message: 'API密钥长度至少10个字符', trigger: 'blur' }
+    { required: true, message: '请输入ASR API密钥', trigger: 'blur' }
   ],
   translation_provider: [{ required: true, message: '请选择翻译服务商', trigger: 'change' }],
   translation_api_key: [
-    { required: true, message: '请输入翻译API密钥', trigger: 'blur' },
-    { min: 10, message: 'API密钥长度至少10个字符', trigger: 'blur' }
+    { required: true, message: '请输入翻译API密钥', trigger: 'blur' }
   ],
   voice_cloning_provider: [
     { required: true, message: '请选择声音克隆服务商', trigger: 'change' }
   ],
   voice_cloning_api_key: [
-    { required: true, message: '请输入声音克隆API密钥', trigger: 'blur' },
-    { min: 10, message: 'API密钥长度至少10个字符', trigger: 'blur' }
+    { required: true, message: '请输入声音克隆API密钥', trigger: 'blur' }
   ]
 }
 
@@ -424,8 +421,39 @@ const loadSettings = async () => {
 /**
  * 保存配置
  */
+const stringFields: Array<keyof UpdateSettingsRequest> = [
+  'processing_mode',
+  'asr_provider',
+  'asr_api_key',
+  'asr_endpoint',
+  'translation_endpoint',
+  'voice_cloning_endpoint',
+  'polishing_provider',
+  'polishing_api_key',
+  'polishing_endpoint',
+  'polishing_custom_prompt',
+  'polishing_video_type',
+  'optimization_provider',
+  'optimization_api_key',
+  'optimization_endpoint',
+  's2st_provider',
+  's2st_api_key',
+  'voice_cloning_provider',
+  'voice_cloning_api_key',
+  'translation_provider',
+  'translation_api_key',
+  'translation_video_type'
+]
+
 const saveSettings = async () => {
   // 表单验证
+  stringFields.forEach(field => {
+    const value = form.value[field]
+    if (typeof value === 'string') {
+      form.value[field] = value.trim() as any
+    }
+  })
+
   const valid = await formRef.value?.validate().catch(() => false)
   if (!valid) return
 

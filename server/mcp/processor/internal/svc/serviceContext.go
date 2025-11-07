@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"video-in-chinese/server/mcp/processor/internal/config"
+	"video-in-chinese/server/mcp/processor/internal/mediautil"
 	"video-in-chinese/server/mcp/processor/internal/storage"
 	"video-in-chinese/server/mcp/processor/pb"
 
@@ -60,6 +61,9 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	// Initialize storage layer
 	redisClient := storage.NewRedisClient(rdb)
 	pathManager := storage.NewPathManager(c.LocalStoragePath)
+
+	// Initialize ffmpeg binary path if provided
+	mediautil.SetFFmpegBinary(c.FfmpegPath)
 
 	// Initialize AIAdaptor gRPC client (using GoZero zrpc)
 	aiAdaptorRpcClient := zrpc.MustNewClient(c.AIAdaptorRpcConf)

@@ -3,7 +3,6 @@ package logic
 import (
 	"context"
 	"fmt"
-	"os/exec"
 	"strconv"
 	"time"
 
@@ -327,7 +326,7 @@ func continueWorkflow(ctx context.Context, svcCtx *svc.ServiceContext, taskID, o
 
 // cutAudioSegment cuts an audio segment from the source audio file using ffmpeg.
 func cutAudioSegment(sourceAudio, outputPath string, startTime, endTime float64) error {
-	cmd := exec.Command("ffmpeg",
+	cmd := mediautil.NewFFmpegCommand(
 		"-i", sourceAudio,
 		"-ss", strconv.FormatFloat(startTime, 'f', 3, 64),
 		"-to", strconv.FormatFloat(endTime, 'f', 3, 64),

@@ -86,6 +86,7 @@ func (l *UpdateSettingsLogic) UpdateSettings(req *types.UpdateSettingsRequest) (
 	if err := encryptAPIKey("polishing_api_key", req.PolishingApiKey); err != nil {
 		return nil, err
 	}
+	addField("polishing_endpoint", req.PolishingEndpoint)
 	addField("polishing_custom_prompt", req.PolishingCustomPrompt)
 	addField("polishing_video_type", req.PolishingVideoType)
 
@@ -105,6 +106,7 @@ func (l *UpdateSettingsLogic) UpdateSettings(req *types.UpdateSettingsRequest) (
 	if err := encryptAPIKey("optimization_api_key", req.OptimizationApiKey); err != nil {
 		return nil, err
 	}
+	addField("optimization_endpoint", req.OptimizationEndpoint)
 
 	// Voice Cloning
 	addField("voice_cloning_provider", req.VoiceCloningProvider)

@@ -19,6 +19,7 @@ type GetSettingsResponse struct {
 	PolishingEnabled                bool   `json:"polishing_enabled"`                   // [必需] 是否启用文本润色功能。
 	PolishingProvider               string `json:"polishing_provider,omitempty"`        // [可选] 文本润色服务商标识。
 	PolishingApiKey                 string `json:"polishing_api_key,omitempty"`         // [可选] 脱敏后的API Key。
+	PolishingEndpoint               string `json:"polishing_endpoint,omitempty"`        // [可选] 自定义的服务端点URL。
 	PolishingCustomPrompt           string `json:"polishing_custom_prompt,omitempty"`   // [可选] 用户自定义的润色 Prompt。
 	PolishingVideoType              string `json:"polishing_video_type,omitempty"`      // [可选] 翻译预设类型："professional_tech"（专业科技）、"casual_natural"（口语自然）、"educational_rigorous"（教育严谨）。
 	TranslationProvider             string `json:"translation_provider"`                // [条件性必需] 翻译服务商标识。
@@ -28,6 +29,7 @@ type GetSettingsResponse struct {
 	OptimizationEnabled             bool   `json:"optimization_enabled"`                // [必需] 是否启用译文优化功能。
 	OptimizationProvider            string `json:"optimization_provider,omitempty"`     // [可选] 译文优化服务商标识。
 	OptimizationApiKey              string `json:"optimization_api_key,omitempty"`      // [可选] 脱敏后的API Key。
+	OptimizationEndpoint            string `json:"optimization_endpoint,omitempty"`     // [可选] 自定义的服务端点URL。
 	VoiceCloningProvider            string `json:"voice_cloning_provider"`              // [条件性必需] 声音克隆服务商标识。
 	VoiceCloningApiKey              string `json:"voice_cloning_api_key"`               // [条件性必需] 脱敏后的API Key。
 	VoiceCloningEndpoint            string `json:"voice_cloning_endpoint,omitempty"`    // [可选] 自定义的服务端点URL。
@@ -57,6 +59,7 @@ type UpdateSettingsRequest struct {
 	PolishingEnabled                *bool  `json:"polishing_enabled,omitempty"`                   // [可选] 使用指针类型以区分 "未提交" 和 "提交了false值"。
 	PolishingProvider               string `json:"polishing_provider,omitempty"`                  // [可选] 文本润色服务商标识。
 	PolishingApiKey                 string `json:"polishing_api_key,omitempty"`                   // [可选] 如果包含"***"则保持原值。
+	PolishingEndpoint               string `json:"polishing_endpoint,omitempty"`                  // [可选] 自定义端点URL。
 	PolishingCustomPrompt           string `json:"polishing_custom_prompt,omitempty"`             // [可选] 用户自定义的润色 Prompt。
 	PolishingVideoType              string `json:"polishing_video_type,omitempty"`                // [可选] 翻译预设类型。
 	TranslationProvider             string `json:"translation_provider,omitempty"`                // [可选] 翻译服务商标识。
@@ -66,6 +69,7 @@ type UpdateSettingsRequest struct {
 	OptimizationEnabled             *bool  `json:"optimization_enabled,omitempty"`                // [可选] 是否启用译文优化。
 	OptimizationProvider            string `json:"optimization_provider,omitempty"`               // [可选] 译文优化服务商标识。
 	OptimizationApiKey              string `json:"optimization_api_key,omitempty"`                // [可选] 如果包含"***"则保持原值。
+	OptimizationEndpoint            string `json:"optimization_endpoint,omitempty"`               // [可选] 自定义端点URL。
 	VoiceCloningProvider            string `json:"voice_cloning_provider,omitempty"`              // [可选] 声音克隆服务商标识。
 	VoiceCloningApiKey              string `json:"voice_cloning_api_key,omitempty"`               // [可选] 如果包含"***"则保持原值。
 	VoiceCloningEndpoint            string `json:"voice_cloning_endpoint,omitempty"`              // [可选] 自定义端点URL。

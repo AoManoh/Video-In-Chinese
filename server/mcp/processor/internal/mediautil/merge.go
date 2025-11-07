@@ -2,8 +2,7 @@ package mediautil
 
 import (
 	"fmt"
-	"os/exec"
-	
+
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
@@ -24,7 +23,7 @@ func MergeVideoAudio(videoPath, audioPath, outputPath string) error {
 	// -c:a aac: encode audio to AAC
 	// -map 0:v:0: use video stream from first input
 	// -map 1:a:0: use audio stream from second input
-	cmd := exec.Command("ffmpeg",
+	cmd := NewFFmpegCommand(
 		"-i", videoPath,
 		"-i", audioPath,
 		"-c:v", "copy",
@@ -34,14 +33,13 @@ func MergeVideoAudio(videoPath, audioPath, outputPath string) error {
 		"-y",
 		outputPath,
 	)
-	
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		logx.Errorf("[Mediautil] Failed to merge video and audio: %v, output: %s", err, string(output))
 		return fmt.Errorf("failed to merge video and audio: %w", err)
 	}
-	
+
 	logx.Infof("[Mediautil] Merged video %s with audio %s to %s", videoPath, audioPath, outputPath)
 	return nil
 }
-

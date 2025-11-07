@@ -3,7 +3,8 @@ package composer
 import (
 	"fmt"
 	"os"
-	"os/exec"
+
+	"video-in-chinese/server/mcp/processor/internal/mediautil"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )
@@ -55,7 +56,7 @@ func (c *Composer) mergeWithBackground(vocalsPath, backgroundPath, outputPath st
 	// ffmpeg -i vocals.wav -i background.wav -filter_complex "[0:a][1:a]amix=inputs=2:duration=first:dropout_transition=2" output.wav
 	// duration=first: use the duration of the first input (vocals)
 	// dropout_transition=2: smooth transition when one input ends
-	cmd := exec.Command("ffmpeg",
+	cmd := mediautil.NewFFmpegCommand(
 		"-i", vocalsPath,
 		"-i", backgroundPath,
 		"-filter_complex", "[0:a][1:a]amix=inputs=2:duration=first:dropout_transition=2",

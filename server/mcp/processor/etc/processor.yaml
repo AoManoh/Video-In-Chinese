@@ -8,7 +8,7 @@ Redis:
   Pass: ""
 
 # 本地存储路径
-LocalStoragePath: ./data/videos
+LocalStoragePath: ../../data/videos
 
 # gRPC 客户端配置（GoZero RpcClientConf 格式）
 AIAdaptorRpcConf:
@@ -29,7 +29,7 @@ TaskPullIntervalSeconds: 5
 MaxConcurrency: 3
 
 # ffmpeg 路径（可选，默认使用系统 PATH）
-FfmpegPath: C:\Environment\ffmpeg-8.0-essentials_build\bin\ffmpeg.exe
+FfmpegPath: C:/Environment/ffmpeg-8.0-essentials_build/bin/ffmpeg.exe
 
 # 日志配置
 Log:

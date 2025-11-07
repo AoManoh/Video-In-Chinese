@@ -1,6 +1,10 @@
 Name: gateway-api
 Host: 0.0.0.0
 Port: 8080
+# Maximum request body size (2GB for video uploads)
+MaxBytes: 2147483648
+# HTTP timeout (10 minutes for large file uploads)
+Timeout: 600000
 
 # Redis configuration
 Redis:

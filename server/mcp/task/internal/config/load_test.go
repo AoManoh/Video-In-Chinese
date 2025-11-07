@@ -25,3 +25,4 @@ func TestLoadConfig(t *testing.T) {
 		t.Fatalf("failed to load config: %v", err)
 	}
 }
+

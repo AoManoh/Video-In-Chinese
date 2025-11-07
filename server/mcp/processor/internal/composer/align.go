@@ -3,8 +3,9 @@ package composer
 import (
 	"fmt"
 	"math"
-	"os/exec"
 	"time"
+
+	"video-in-chinese/server/mcp/processor/internal/mediautil"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )
@@ -98,7 +99,7 @@ func (c *Composer) padSilence(audioPath string, timeDiff time.Duration, outputPa
 
 	// ffmpeg -i input.wav -f lavfi -i anullsrc=r=44100:cl=stereo -filter_complex "[0:a][1:a]concat=n=2:v=0:a=1[out]" -map "[out]" -t <total_duration> output.wav
 	// Simplified: ffmpeg -i input.wav -af "apad=pad_dur=<silence_duration>" output.wav
-	cmd := exec.Command("ffmpeg",
+	cmd := mediautil.NewFFmpegCommand(
 		"-i", audioPath,
 		"-af", fmt.Sprintf("apad=pad_dur=%.3f", silenceDurationSec),
 		"-y",
@@ -127,7 +128,7 @@ func (c *Composer) padSilence(audioPath string, timeDiff time.Duration, outputPa
 func (c *Composer) adjustSpeed(audioPath string, speedRatio float64, outputPath string) error {
 	// ffmpeg -i input.wav -filter:a "atempo=<speed_ratio>" output.wav
 	// Note: atempo filter only supports 0.5-2.0 range, which is sufficient for our 0.9-1.1 range
-	cmd := exec.Command("ffmpeg",
+	cmd := mediautil.NewFFmpegCommand(
 		"-i", audioPath,
 		"-filter:a", fmt.Sprintf("atempo=%.3f", speedRatio),
 		"-y",
