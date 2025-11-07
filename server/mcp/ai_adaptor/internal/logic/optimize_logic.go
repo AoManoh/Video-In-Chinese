@@ -98,8 +98,16 @@ func (l *OptimizeLogic) ProcessOptimize(ctx context.Context, req *pb.OptimizeReq
 	}
 
 	// 步骤 6: 调用适配器执行译文优化
+	// 获取模型名称，如果未配置则使用默认值
+	modelName := appConfig.OptimizationModelName
+	if modelName == "" {
+		modelName = "gemini-2.5-flash" // 默认使用 Gemini Flash（更快）
+		log.Printf("[OptimizeLogic] WARNING: No model specified, using default: %s", modelName)
+	}
+
 	optimizedText, err := adapter.Optimize(
 		req.Text,
+		modelName,
 		appConfig.OptimizationAPIKey,
 		appConfig.OptimizationEndpoint,
 	)

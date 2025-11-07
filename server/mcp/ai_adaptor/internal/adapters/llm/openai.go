@@ -70,13 +70,14 @@ func NewOpenAILLMAdapter() *OpenAILLMAdapter {
 //
 // 使用示例:
 //
-//	polished, err := adapter.Polish(text, "professional_tech", "", apiKey, endpoint)
+//	polished, err := adapter.Polish(text, "professional_tech", "", "gemini-2.5-pro", apiKey, endpoint)
 //
 // 参数说明:
 //
 //	text string: 待润色文本，不能为空。
 //	videoType string: 视频语气标签，决定系统 Prompt 语气。
 //	customPrompt string: 可选自定义提示词，空字符串使用默认模版。
+//	modelName string: LLM 模型名称（如 "gpt-4o", "gemini-2.5-pro", "gemini-2.5-flash"）。
 //	apiKey string: OpenAI 或兼容代理的鉴权密钥。
 //	endpoint string: 可选自定义 API 地址，留空使用默认 https://api.openai.com。
 //
@@ -93,8 +94,8 @@ func NewOpenAILLMAdapter() *OpenAILLMAdapter {
 //
 // 注意事项:
 //   - 长文本可能触发 Token 限制，调用方应做好截断或重试策略。
-func (o *OpenAILLMAdapter) Polish(text, videoType, customPrompt, apiKey, endpoint string) (string, error) {
-	log.Printf("[OpenAILLMAdapter] Starting text polishing: video_type=%s", videoType)
+func (o *OpenAILLMAdapter) Polish(text, videoType, customPrompt, modelName, apiKey, endpoint string) (string, error) {
+	log.Printf("[OpenAILLMAdapter] Starting text polishing: video_type=%s, model=%s", videoType, modelName)
 
 	// 步骤 1: 验证输入参数
 	if text == "" {
@@ -102,6 +103,10 @@ func (o *OpenAILLMAdapter) Polish(text, videoType, customPrompt, apiKey, endpoin
 	}
 	if apiKey == "" {
 		return "", fmt.Errorf("API 密钥不能为空")
+	}
+	if modelName == "" {
+		modelName = "gpt-4o" // 默认模型
+		log.Printf("[OpenAILLMAdapter] WARNING: No model specified, using default: %s", modelName)
 	}
 
 	// 步骤 2: 初始化 OpenAI 客户端
@@ -122,7 +127,7 @@ func (o *OpenAILLMAdapter) Polish(text, videoType, customPrompt, apiKey, endpoin
 	// 步骤 4: 调用 OpenAI API
 	ctx := context.Background()
 	request := openai.ChatCompletionRequest{
-		Model: "gpt-4o", // 默认模型，实际使用时会被服务端映射到对应的模型
+		Model: modelName, // 使用配置中的模型名称
 		Messages: []openai.ChatCompletionMessage{
 			{
 				Role:    openai.ChatMessageRoleSystem,
@@ -133,7 +138,7 @@ func (o *OpenAILLMAdapter) Polish(text, videoType, customPrompt, apiKey, endpoin
 				Content: userPrompt,
 			},
 		},
-		Temperature: 0.7,  // 适中的创造性
+		Temperature: 0.3,  // 中等偏低温度，平衡准确性与表达优化，避免过于机械或过于创意
 		MaxTokens:   2048, // 最大输出 Token 数
 	}
 
@@ -168,11 +173,12 @@ func (o *OpenAILLMAdapter) Polish(text, videoType, customPrompt, apiKey, endpoin
 //
 // 使用示例:
 //
-//	optimized, err := adapter.Optimize(text, apiKey, endpoint)
+//	optimized, err := adapter.Optimize(text, "gemini-2.5-pro", apiKey, endpoint)
 //
 // 参数说明:
 //
 //	text string: 待优化文本，不能为空。
+//	modelName string: LLM 模型名称（如 "gpt-4o", "gemini-2.5-pro", "gemini-2.5-flash"）。
 //	apiKey string: OpenAI 或兼容代理的鉴权密钥。
 //	endpoint string: 可选自定义 API 地址，留空使用默认 https://api.openai.com。
 //
@@ -189,8 +195,8 @@ func (o *OpenAILLMAdapter) Polish(text, videoType, customPrompt, apiKey, endpoin
 //
 // 注意事项:
 //   - 输入长度需满足模型上下文限制，调用方可在外层做分页处理。
-func (o *OpenAILLMAdapter) Optimize(text, apiKey, endpoint string) (string, error) {
-	log.Printf("[OpenAILLMAdapter] Starting translation optimization")
+func (o *OpenAILLMAdapter) Optimize(text, modelName, apiKey, endpoint string) (string, error) {
+	log.Printf("[OpenAILLMAdapter] Starting translation optimization: model=%s", modelName)
 
 	// 步骤 1: 验证输入参数
 	if text == "" {
@@ -198,6 +204,10 @@ func (o *OpenAILLMAdapter) Optimize(text, apiKey, endpoint string) (string, erro
 	}
 	if apiKey == "" {
 		return "", fmt.Errorf("API 密钥不能为空")
+	}
+	if modelName == "" {
+		modelName = "gpt-4o" // 默认模型
+		log.Printf("[OpenAILLMAdapter] WARNING: No model specified, using default: %s", modelName)
 	}
 
 	// 步骤 2: 初始化 OpenAI 客户端
@@ -209,7 +219,7 @@ func (o *OpenAILLMAdapter) Optimize(text, apiKey, endpoint string) (string, erro
 	client := openai.NewClientWithConfig(config)
 
 	// 步骤 3: 构建 Prompt
-	systemPrompt := "你是一位专业的翻译优化专家。请优化以下翻译文本，使其更加流畅、自然、符合中文表达习惯。保持原意不变，只优化表达方式。"
+	systemPrompt := "你是一位专业的翻译优化专家。请优化以下翻译文本，使其更加流畅、自然、符合中文表达习惯。保持原意不变，只优化表达方式。\n\n重要：请直接返回优化后的文本，不要添加任何解释、说明或多个方案。"
 	userPrompt := fmt.Sprintf("请优化以下翻译文本：\n\n%s", text)
 
 	log.Printf("[OpenAILLMAdapter] System prompt: %s", systemPrompt)
@@ -218,7 +228,7 @@ func (o *OpenAILLMAdapter) Optimize(text, apiKey, endpoint string) (string, erro
 	// 步骤 4: 调用 OpenAI API
 	ctx := context.Background()
 	request := openai.ChatCompletionRequest{
-		Model: "gpt-4o", // 默认模型，实际使用时会被服务端映射到对应的模型
+		Model: modelName, // 使用配置中的模型名称
 		Messages: []openai.ChatCompletionMessage{
 			{
 				Role:    openai.ChatMessageRoleSystem,

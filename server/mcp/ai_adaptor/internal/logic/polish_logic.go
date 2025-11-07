@@ -99,7 +99,7 @@ func (l *PolishLogic) ProcessPolish(ctx context.Context, req *pb.PolishRequest) 
 		return nil, fmt.Errorf("获取 LLM 适配器失败: %w", err)
 	}
 
-	// 步骤 6: 调用适配器执行文本润色
+	// 步骤 6: 调用适配器执行文本润色（带重试机制）
 	// 使用配置中的 video_type 和 custom_prompt
 	videoType := appConfig.PolishingVideoType
 	if videoType == "" {
@@ -108,21 +108,54 @@ func (l *PolishLogic) ProcessPolish(ctx context.Context, req *pb.PolishRequest) 
 
 	customPrompt := appConfig.PolishingCustomPrompt
 
-	polishedText, err := adapter.Polish(
-		req.Text,
-		videoType,
-		customPrompt,
-		appConfig.PolishingAPIKey,
-		appConfig.PolishingEndpoint,
-	)
-	if err != nil {
-		log.Printf("[PolishLogic] ERROR: Polishing failed: %v", err)
-		return nil, fmt.Errorf("文本润色失败: %w", err)
+	// 获取模型名称，如果未配置则使用默认值
+	modelName := appConfig.PolishingModelName
+	if modelName == "" {
+		modelName = "gemini-2.5-flash" // 默认使用 Gemini Flash（更快）
+		log.Printf("[PolishLogic] WARNING: No model specified, using default: %s", modelName)
 	}
 
-	// 步骤 7: 返回结果
-	log.Printf("[PolishLogic] Polishing completed successfully: polished_text_length=%d", len(polishedText))
+	// 重试机制：最多尝试 3 次
+	const maxRetries = 3
+	var polishedText string
+	var lastErr error
+
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		polishedText, err = adapter.Polish(
+			req.Text,
+			videoType,
+			customPrompt,
+			modelName,
+			appConfig.PolishingAPIKey,
+			appConfig.PolishingEndpoint,
+		)
+
+		// 检查是否成功且返回非空结果
+		if err == nil && polishedText != "" {
+			log.Printf("[PolishLogic] Polishing succeeded on attempt %d: polished_text_length=%d", attempt, len(polishedText))
+			return &pb.PolishResponse{
+				PolishedText: polishedText,
+			}, nil
+		}
+
+		// 记录失败原因
+		if err != nil {
+			lastErr = err
+			log.Printf("[PolishLogic] WARNING: Polishing attempt %d/%d failed with error: %v", attempt, maxRetries, err)
+		} else {
+			lastErr = fmt.Errorf("返回空字符串")
+			log.Printf("[PolishLogic] WARNING: Polishing attempt %d/%d returned empty string", attempt, maxRetries)
+		}
+
+		// 如果不是最后一次尝试，等待后重试
+		if attempt < maxRetries {
+			log.Printf("[PolishLogic] Retrying polishing (attempt %d/%d)...", attempt+1, maxRetries)
+		}
+	}
+
+	// 步骤 7: 所有重试都失败，降级策略：返回原文本
+	log.Printf("[PolishLogic] WARNING: All %d polishing attempts failed (last error: %v), falling back to original text", maxRetries, lastErr)
 	return &pb.PolishResponse{
-		PolishedText: polishedText,
+		PolishedText: req.Text, // 降级：返回原文本
 	}, nil
 }

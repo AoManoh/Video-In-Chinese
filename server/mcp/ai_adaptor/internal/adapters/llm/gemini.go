@@ -152,8 +152,11 @@ type GeminiPromptFeedback struct {
 //
 // 注意事项:
 //   - Gemini API 需要在 URL 中附带 key，调用方应妥善保管凭证。
-func (g *GeminiLLMAdapter) Polish(text, videoType, customPrompt, apiKey, endpoint string) (string, error) {
-	log.Printf("[GeminiLLMAdapter] Starting text polishing: video_type=%s", videoType)
+func (g *GeminiLLMAdapter) Polish(text, videoType, customPrompt, modelName, apiKey, endpoint string) (string, error) {
+	log.Printf("[GeminiLLMAdapter] Starting text polishing: video_type=%s, model=%s", videoType, modelName)
+
+	// 注意：Gemini 适配器忽略 modelName 参数，因为模型在 URL 中指定
+	// 如果需要支持不同模型，应在 endpoint 中包含模型名称
 
 	// 步骤 1: 验证输入参数
 	if text == "" {
@@ -199,8 +202,11 @@ func (g *GeminiLLMAdapter) Polish(text, videoType, customPrompt, apiKey, endpoin
 //
 // 注意事项:
 //   - 任务需满足 Gemini 模型的 Token 限制，建议调用方控制输入长度。
-func (g *GeminiLLMAdapter) Optimize(text, apiKey, endpoint string) (string, error) {
-	log.Printf("[GeminiLLMAdapter] Starting translation optimization")
+func (g *GeminiLLMAdapter) Optimize(text, modelName, apiKey, endpoint string) (string, error) {
+	log.Printf("[GeminiLLMAdapter] Starting translation optimization: model=%s", modelName)
+
+	// 注意：Gemini 适配器忽略 modelName 参数，因为模型在 URL 中指定
+	// 如果需要支持不同模型，应在 endpoint 中包含模型名称
 
 	// 步骤 1: 验证输入参数
 	if text == "" {
@@ -252,7 +258,7 @@ func (g *GeminiLLMAdapter) callGeminiAPI(systemPrompt, userPrompt, apiKey, endpo
 			},
 		},
 		GenerationConfig: &GeminiGenerationConfig{
-			Temperature:     0.7,  // 适中的创造性
+			Temperature:     0.3,  // 中等偏低温度，平衡准确性与表达优化，避免过于机械或过于创意
 			TopP:            0.9,  // Top-P 采样
 			TopK:            40,   // Top-K 采样
 			MaxOutputTokens: 2048, // 最大输出 Token 数
@@ -396,7 +402,7 @@ func buildPolishPrompt(videoType, customPrompt string) string {
 	}
 
 	// 根据视频类型构建默认 Prompt
-	basePrompt := "你是一位专业的文本润色专家。请润色以下文本，使其更加流畅、自然、符合表达习惯。保持原意不变，只优化表达方式。"
+	basePrompt := "你是一位专业的文本润色专家。请润色以下文本，使其更加流畅、自然、符合表达习惯。保持原意不变，只优化表达方式。\n\n重要：请直接返回润色后的文本，不要添加任何解释、说明或多个方案。"
 
 	switch videoType {
 	case "professional_tech":

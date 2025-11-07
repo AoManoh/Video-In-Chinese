@@ -170,12 +170,14 @@ type LLMAdapter interface {
 	//   - 根据视频类型调整语气，生成更符合播报场景的文本。
 	// 设计决策:
 	//   - 支持传入自定义 Prompt，使用者可覆盖默认策略。
+	//   - 支持传入模型名称，允许使用不同的 LLM 模型。
 	// 使用示例:
-	//   output, err := adapter.Polish(text, "professional_tech", "", key, endpoint)
+	//   output, err := adapter.Polish(text, "professional_tech", "", "gemini-2.5-pro", key, endpoint)
 	// 参数说明:
 	//   text string: 原始文本。
 	//   videoType string: 视频风格标签。
 	//   customPrompt string: 可选自定义 Prompt。
+	//   modelName string: LLM 模型名称（如 "gpt-4o", "gemini-2.5-pro"）。
 	//   apiKey string: 模型密钥。
 	//   endpoint string: 可选自定义地址。
 	// 返回值说明:
@@ -185,7 +187,7 @@ type LLMAdapter interface {
 	//   - 透传供应商错误细节，方便调用方记录与分析。
 	// 注意事项:
 	//   - 自定义 Prompt 需控制长度以避免超过 token 限制。
-	Polish(text, videoType, customPrompt, apiKey, endpoint string) (string, error)
+	Polish(text, videoType, customPrompt, modelName, apiKey, endpoint string) (string, error)
 
 	// Optimize 针对完整脚本执行语义优化，强调结构调整和重点突出。
 	//
@@ -193,10 +195,12 @@ type LLMAdapter interface {
 	//   - 对输入脚本重新组织段落、提醒补充上下文或裁剪冗余内容。
 	// 设计决策:
 	//   - 保持签名精简，使调用方只需要提供脚本和密钥即可运行。
+	//   - 支持传入模型名称，允许使用不同的 LLM 模型。
 	// 使用示例:
-	//   optimized, err := adapter.Optimize(script, key, "")
+	//   optimized, err := adapter.Optimize(script, "gemini-2.5-pro", key, "")
 	// 参数说明:
 	//   text string: 待优化脚本。
+	//   modelName string: LLM 模型名称（如 "gpt-4o", "gemini-2.5-pro"）。
 	//   apiKey string: 模型密钥。
 	//   endpoint string: 可选自定义地址。
 	// 返回值说明:
@@ -206,7 +210,7 @@ type LLMAdapter interface {
 	//   - 将供应商的错误码原样返回，由业务逻辑决定是否降级。
 	// 注意事项:
 	//   - 建议调用方在外层切片长文本，以免超出模型限制。
-	Optimize(text, apiKey, endpoint string) (string, error)
+	Optimize(text, modelName, apiKey, endpoint string) (string, error)
 }
 
 // VoiceCloningAdapter 抽象了语音克隆服务能力，使业务层可以重用 VoiceCache 并在供应商间自由切换。
