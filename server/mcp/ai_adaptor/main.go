@@ -102,6 +102,9 @@ func initializeAdapters(registry *adapters.AdapterRegistry, voiceManager *voice_
 	registry.RegisterLLM("openai", llm.NewOpenAILLMAdapter())
 	log.Println("✓ Registered LLM adapter: openai")
 
+	registry.RegisterLLM("openai-compatible", llm.NewOpenAILLMAdapter())
+	log.Println("✓ Registered LLM adapter: openai-compatible")
+
 	// 注册声音克隆适配器
 	registry.RegisterVoiceCloning("aliyun-cosyvoice", voice_cloning.NewAliyunCosyVoiceAdapter(voiceManager))
 	log.Println("✓ Registered voice cloning adapter: aliyun-cosyvoice")
