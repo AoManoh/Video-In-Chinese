@@ -55,3 +55,4 @@ test_audio*.wav
 docs/
 scripts/
 package-lock.json
+notes/
