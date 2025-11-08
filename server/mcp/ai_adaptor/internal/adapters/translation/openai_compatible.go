@@ -129,7 +129,7 @@ func (o *OpenAICompatibleTranslationAdapter) Translate(text, sourceLang, targetL
 	// 步骤 4: 调用 OpenAI API
 	ctx := context.Background()
 	request := openai.ChatCompletionRequest{
-		Model: "gpt-4o", // 默认模型，实际使用时会被服务端映射到对应的模型
+		Model: "gemini-2.5-flash", // 默认模型，与润色/优化保持一致
 		Messages: []openai.ChatCompletionMessage{
 			{
 				Role:    openai.ChatMessageRoleSystem,
@@ -264,4 +264,3 @@ func getLanguageName(langCode string) string {
 	}
 	return langCode // 如果没有映射，直接返回代码
 }
-
