@@ -5,20 +5,42 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"io"
 )
 
+// parseEncryptionSecret parses the encryption secret.
+// Supports two formats:
+//  1. 64 hex characters (decoded to 32 bytes) - recommended format
+//  2. 32 bytes raw string - compatible with legacy format
+func parseEncryptionSecret(secret string) ([]byte, error) {
+	// Try to decode as hex string (64 chars -> 32 bytes)
+	if len(secret) == 64 {
+		decoded, err := hex.DecodeString(secret)
+		if err == nil && len(decoded) == 32 {
+			return decoded, nil
+		}
+	}
+
+	// If not valid hex, try as raw string (32 bytes)
+	if len(secret) != 32 {
+		return nil, fmt.Errorf("encryption secret must be either 64 hex characters or 32 bytes string, got %d bytes", len(secret))
+	}
+	return []byte(secret), nil
+}
+
 // EncryptAPIKey encrypts an API key using AES-256-GCM
 // Returns base64(nonce + ciphertext)
 func EncryptAPIKey(plaintext string, secret string) (string, error) {
-	// Validate secret length (must be 32 bytes for AES-256)
-	if len(secret) != 32 {
-		return "", fmt.Errorf("encryption secret must be exactly 32 bytes, got %d", len(secret))
+	// Parse and validate secret
+	key, err := parseEncryptionSecret(secret)
+	if err != nil {
+		return "", err
 	}
 
 	// Create AES cipher
-	block, err := aes.NewCipher([]byte(secret))
+	block, err := aes.NewCipher(key)
 	if err != nil {
 		return "", fmt.Errorf("failed to create cipher: %w", err)
 	}
@@ -48,9 +70,10 @@ func EncryptAPIKey(plaintext string, secret string) (string, error) {
 // DecryptAPIKey decrypts an API key using AES-256-GCM
 // Expects base64(nonce + ciphertext)
 func DecryptAPIKey(encoded string, secret string) (string, error) {
-	// Validate secret length (must be 32 bytes for AES-256)
-	if len(secret) != 32 {
-		return "", fmt.Errorf("encryption secret must be exactly 32 bytes, got %d", len(secret))
+	// Parse and validate secret (支持 64 字符十六进制或 32 字节原始字符串)
+	key, err := parseEncryptionSecret(secret)
+	if err != nil {
+		return "", err
 	}
 
 	// Decode base64
@@ -60,7 +83,7 @@ func DecryptAPIKey(encoded string, secret string) (string, error) {
 	}
 
 	// Create AES cipher
-	block, err := aes.NewCipher([]byte(secret))
+	block, err := aes.NewCipher(key)
 	if err != nil {
 		return "", fmt.Errorf("failed to create cipher: %w", err)
 	}
@@ -124,4 +147,3 @@ func MaskAPIKey(apiKey string) string {
 func IsMaskedAPIKey(apiKey string) bool {
 	return apiKey != "" && (apiKey == "***" || len(apiKey) > 3 && apiKey[len(apiKey)-3:] == "***" || len(apiKey) > 5 && apiKey[len(apiKey)-5:len(apiKey)-2] == "***")
 }
-

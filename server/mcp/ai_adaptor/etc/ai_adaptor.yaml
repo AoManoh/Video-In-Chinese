@@ -12,7 +12,7 @@ Redis:
 
 # API 密钥加密密钥（32 字节十六进制字符串，64 个字符）
 # 生成方法: openssl rand -hex 32
-ApiKeyEncryptionSecret: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+ApiKeyEncryptionSecret: "741b79f9796835a806a3b2dc8085a4ffee548b6a87f8a22357ac8dd5382e2668"
 
 # 配置缓存配置
 ConfigCacheTTL: 600  # 配置缓存过期时间（秒，默认 10 分钟）
