@@ -103,11 +103,10 @@ class SpleeterWrapper:
             # 创建 Separator 实例
             # params_descriptor: 模型配置（2stems/4stems/5stems）
             # multiprocess: 是否使用多进程（设置为 False，避免并发问题）
+            # 注意: Spleeter 2.4.2 不支持 model_root 参数，模型使用默认路径 ~/.spleeter
             separator_kwargs = {
                 'multiprocess': False,
             }
-            if self.model_path:
-                separator_kwargs['model_root'] = self.model_path
 
             model = Separator(
                 f'spleeter:{stems}stems',
@@ -176,7 +175,7 @@ class SpleeterWrapper:
                 audio_path,
                 output_dir,
                 codec='wav',
-                filename_format='{instrument}.{codec}'
+                filename_format='{filename}/{instrument}.{codec}'
             )
 
             separation_time = time.time() - start_time
@@ -189,22 +188,34 @@ class SpleeterWrapper:
                 )
             
             # 构建输出文件路径
+            # 注意: Spleeter 的 separate_to_file 方法会在 output_dir 中创建一个以输入文件名命名的子目录
+            # 例如: 输入 original_audio.wav，Spleeter 会创建 output_dir/original_audio/ 子目录
+            # 然后在该子目录中放置分离后的文件
+            
+            # 获取输入文件名（不含扩展名）
+            input_filename = os.path.splitext(os.path.basename(audio_path))[0]
+            
+            # Spleeter 创建的子目录路径
+            output_subdir = os.path.join(output_dir, input_filename)
+            
+            # 构建输出文件路径，指向 Spleeter 实际创建的文件位置
             output_paths = {}
             if stems == 2:
-                output_paths['vocals'] = os.path.join(output_dir, 'vocals.wav')
-                output_paths['accompaniment'] = os.path.join(output_dir, 'accompaniment.wav')
+                output_paths['vocals'] = os.path.join(output_subdir, 'vocals.wav')
+                output_paths['accompaniment'] = os.path.join(output_subdir, 'accompaniment.wav')
             elif stems == 4:
-                output_paths['vocals'] = os.path.join(output_dir, 'vocals.wav')
-                output_paths['drums'] = os.path.join(output_dir, 'drums.wav')
-                output_paths['bass'] = os.path.join(output_dir, 'bass.wav')
-                output_paths['other'] = os.path.join(output_dir, 'other.wav')
+                output_paths['vocals'] = os.path.join(output_subdir, 'vocals.wav')
+                output_paths['drums'] = os.path.join(output_subdir, 'drums.wav')
+                output_paths['bass'] = os.path.join(output_subdir, 'bass.wav')
+                output_paths['other'] = os.path.join(output_subdir, 'other.wav')
             elif stems == 5:
-                output_paths['vocals'] = os.path.join(output_dir, 'vocals.wav')
-                output_paths['drums'] = os.path.join(output_dir, 'drums.wav')
-                output_paths['bass'] = os.path.join(output_dir, 'bass.wav')
-                output_paths['piano'] = os.path.join(output_dir, 'piano.wav')
-                output_paths['other'] = os.path.join(output_dir, 'other.wav')
+                output_paths['vocals'] = os.path.join(output_subdir, 'vocals.wav')
+                output_paths['drums'] = os.path.join(output_subdir, 'drums.wav')
+                output_paths['bass'] = os.path.join(output_subdir, 'bass.wav')
+                output_paths['piano'] = os.path.join(output_subdir, 'piano.wav')
+                output_paths['other'] = os.path.join(output_subdir, 'other.wav')
             
+            logger.debug(f'Output files will be located in subdirectory: {output_subdir}')
             return output_paths
             
         except Exception as e:

@@ -2,7 +2,10 @@
 AudioSeparator 服务配置管理模块
 
 负责从环境变量读取配置，提供默认值
-参考文档: AudioSeparator-design-detail.md v2.0
+当前使用: Demucs (Hybrid Transformer)
+参考文档: 
+- Demucs官方: https://github.com/adefossez/demucs
+- DeepWiki: facebookresearch/demucs/4-python-api
 """
 
 import logging
@@ -18,11 +21,13 @@ class AudioSeparatorConfig:
         # gRPC 服务端口
         self.grpc_port = int(os.getenv('AUDIO_SEPARATOR_GRPC_PORT', '50052'))
         
-        # Spleeter 模型配置
-        self.model_name = os.getenv('AUDIO_SEPARATOR_MODEL_NAME', 'spleeter:2stems')
+        # Demucs 模型配置
+        # 参考: DeepWiki facebookresearch/demucs/5.1-models-and-variants
+        self.model_name = os.getenv('AUDIO_SEPARATOR_MODEL_NAME', 'htdemucs')
         self.model_path = os.getenv('AUDIO_SEPARATOR_MODEL_PATH', '/models')
-        self.allowed_stems = (2, 4, 5)
-        self.default_stems = self._parse_default_stems(self.model_name)
+        # Demucs 固定输出4stems，但我们保持stems参数用于接口兼容
+        self.allowed_stems = (2, 4)  # 2=仅vocals+other, 4=全部stems
+        self.default_stems = 4  # Demucs默认输出4个stems
         
         # 并发控制
         self.max_workers = int(os.getenv('AUDIO_SEPARATOR_MAX_WORKERS', '1'))
@@ -56,10 +61,12 @@ class AudioSeparatorConfig:
         if self.timeout_seconds < 60:
             raise ValueError(f"Invalid timeout: {self.timeout_seconds}. Must be >= 60 seconds.")
         
-        # 验证 model_name 格式
-        valid_models = [f'spleeter:{stem}stems' for stem in self.allowed_stems]
+        # 验证 model_name 格式（Demucs 模型）
+        # 参考: DeepWiki facebookresearch/demucs/5.1-models-and-variants
+        valid_models = ['htdemucs', 'htdemucs_ft', 'htdemucs_6s', 'mdx_extra', 'mdx', 'hdemucs_mmi']
         if self.model_name not in valid_models:
-            raise ValueError(f"Invalid model_name: {self.model_name}. Must be one of {valid_models}.")
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Model {self.model_name} not in known list {valid_models}, but will try to use it anyway.")
 
     @staticmethod
     def _parse_default_stems(model_name: str) -> int:
@@ -76,9 +83,12 @@ class AudioSeparatorConfig:
         return 2
 
     def resolve_stems(self, requested_stems: int) -> int:
-        """将请求的 stems 映射为受支持的合法值"""
+        """将请求的 stems 映射为受支持的合法值（Demucs总是返回4stems）"""
+        # Demucs 总是输出4个stems: drums, bass, vocals, other
+        # 参考: Context7 /adefossez/demucs
         if requested_stems == 0:
             return self.default_stems
+        # 对于兼容性，接受2或4，但实际总是处理4个stems
         if requested_stems not in self.allowed_stems:
             raise ValueError(
                 f"Invalid stems: {requested_stems}. Must be one of {self.allowed_stems} or 0."

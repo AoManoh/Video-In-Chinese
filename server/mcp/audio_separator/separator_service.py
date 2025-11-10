@@ -1,4 +1,4 @@
-"""
+﻿"""
 AudioSeparator gRPC 服务实现
 
 实现 SeparateAudio 接口的关键逻辑步骤。
@@ -16,7 +16,7 @@ from concurrent import futures
 from proto import audioseparator_pb2
 from proto import audioseparator_pb2_grpc
 
-from spleeter_wrapper import SpleeterWrapper
+from demucs_wrapper import DemucsWrapper
 from config import AudioSeparatorConfig
 
 
@@ -29,15 +29,18 @@ class AudioSeparatorServicer(audioseparator_pb2_grpc.AudioSeparatorServicer):
     def __init__(self, config: AudioSeparatorConfig):
         """初始化服务并准备模型包装器"""
         self.config = config
-        self.spleeter = SpleeterWrapper(
-            model_path=config.model_path,
-            default_model=config.model_name,
-            use_gpu=config.use_gpu,
+        # 使用 Demucs 替换 Spleeter
+        # 参考: DeepWiki facebookresearch/demucs/4-python-api
+        device = 'cuda' if config.use_gpu else 'cpu'
+        self.demucs = DemucsWrapper(
+            default_model='htdemucs',  # Hybrid Transformer Demucs (SOTA)
+            device=device,
+            segment=None,  # 自动确定片段长度
+            shifts=1,  # 默认1次时间偏移
         )
         logger.info(
-            "AudioSeparatorServicer initialized (model_path=%s, default_model=%s)",
-            config.model_path,
-            config.model_name,
+            "AudioSeparatorServicer initialized with Demucs (device=%s, model=htdemucs)",
+            device,
         )
 
     def SeparateAudio(self, request, context):
@@ -74,10 +77,12 @@ class AudioSeparatorServicer(audioseparator_pb2_grpc.AudioSeparatorServicer):
         )
 
         try:
-            output_paths = self.spleeter.separate(
+            # 使用 Demucs 分离
+            # Demucs 默认输出4个stems，我们需要转换为与Spleeter兼容的格式
+            output_paths = self.demucs.separate(
                 audio_path=audio_path,
                 output_dir=output_dir,
-                stems=stems,
+                model_name=None,  # 使用默认模型
                 timeout_seconds=self.config.timeout_seconds,
             )
             self._validate_output_files(stems, output_paths)
@@ -95,10 +100,12 @@ class AudioSeparatorServicer(audioseparator_pb2_grpc.AudioSeparatorServicer):
                 log_details,
             )
 
+            # Demucs 输出: drums, bass, vocals, other, accompaniment
+            # accompaniment 是 drums + bass + other 的混合（完整背景音）
             response = audioseparator_pb2.SeparateAudioResponse(
                 success=True,
                 vocals_path=output_paths.get('vocals', ''),
-                accompaniment_path=output_paths.get('accompaniment', ''),
+                accompaniment_path=output_paths.get('accompaniment', ''),  # 完整背景音
                 processing_time_ms=processing_time_ms,
             )
 
@@ -159,12 +166,8 @@ class AudioSeparatorServicer(audioseparator_pb2_grpc.AudioSeparatorServicer):
         if not output_paths:
             raise RuntimeError("No output files were produced by the separation pipeline")
 
-        if len(output_paths) < stems:
-            # Spleeter 应至少输出请求数量的频谱轨道，否则视为异常
-            raise RuntimeError(
-                f"Expected at least {stems} stems, received {len(output_paths)}"
-            )
-
+        # Demucs 总是输出4个stems: drums, bass, vocals, other
+        # 参考: DeepWiki facebookresearch/demucs/1-overview
         min_file_size = 1024  # bytes
 
         for stem_name, stem_path in output_paths.items():
@@ -181,8 +184,9 @@ class AudioSeparatorServicer(audioseparator_pb2_grpc.AudioSeparatorServicer):
                     f"Expected >= {min_file_size} bytes."
                 )
 
-        if stems == 2 and 'accompaniment' not in output_paths:
-            raise RuntimeError("2 stems separation must include 'accompaniment' output")
+        # Demucs 必须包含 vocals（我们主要需要的）
+        if 'vocals' not in output_paths:
+            raise RuntimeError("Demucs separation must include 'vocals' output")
 
     @staticmethod
     def _extract_task_id(audio_path: str) -> str:

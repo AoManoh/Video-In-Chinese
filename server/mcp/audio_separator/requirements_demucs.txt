@@ -1,0 +1,31 @@
+# AudioSeparator 服务 Demucs 依赖清单
+# 基于官方文档：https://github.com/adefossez/demucs
+# DeepWiki: facebookresearch/demucs/2.1-environment-setup
+# Context7: /adefossez/demucs
+
+# gRPC 核心库（与 Spleeter 共用）
+grpcio>=1.60.0
+grpcio-tools>=1.60.0
+
+# Demucs 核心依赖（基于官方 requirements_minimal.txt）
+# 来源：https://github.com/facebookresearch/demucs/blob/main/requirements_minimal.txt
+torch>=2.0.0
+torchaudio>=2.0.0
+demucs>=4.0.0
+
+# Demucs 必需依赖
+julius>=0.2.3        # High-quality audio resampling
+lameenc>=1.2         # MP3 encoding
+einops               # Tensor operations
+dora-search          # Model management
+openunmix            # Used by some models
+tqdm                 # Progress bars
+
+# 音频处理库
+ffmpeg-python>=0.2.0
+soundfile>=0.12.0
+
+# 日志和工具
+protobuf>=4.21.0
+
+

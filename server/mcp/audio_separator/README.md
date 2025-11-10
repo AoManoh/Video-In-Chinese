@@ -150,18 +150,59 @@ pytest tests/test_separator_service_integration.py
 - 内存占用: 1-2GB
 - 模型加载时间: 10-20 秒
 
+## 注意事项
+
+### Windows 本地开发环境
+
+在 Windows 环境中使用虚拟环境时，您可能会观察到以下现象：
+
+**现象描述**：
+- 使用虚拟环境的 `python.exe` 启动服务后，进程列表中显示的是**系统 Python 路径**
+- 例如：`C:\Environment\python\python3.11\python.exe` 而不是 `D:\..\.venv\Scripts\python.exe`
+
+**根本原因**：
+这是 **Windows venv 的标准实现方式**，不是 Bug：
+1. 虚拟环境的 `python.exe` 是一个**轻量级启动器**（约 3-4 MB 内存）
+2. 它的职责是设置正确的 `sys.path`（指向虚拟环境的 site-packages）
+3. 然后调用系统 Python 解释器执行实际工作（约 200+ MB 内存）
+
+**验证方法**：
+```powershell
+# 检查进程
+Get-Process python | Select-Object Id, @{Name='Memory(MB)';Expression={[math]::Round($_.WorkingSet/1MB,2)}}, Path
+
+# 您会看到两个进程：
+# 1. 小进程（3-4 MB）：虚拟环境的启动器
+# 2. 大进程（200+ MB）：系统 Python，但加载虚拟环境的包
+```
+
+**重要说明**：
+- **功能完全正常**：服务正确加载虚拟环境的所有依赖（torch, demucs 等）
+- **依赖隔离有效**：所有第三方包来自虚拟环境，不会污染系统环境
+- **仅视觉混淆**：进程列表显示系统 Python 路径，但不影响功能
+- **生产环境无此问题**：Docker 部署时不存在此现象
+
+**详细分析**：
+参见 [docs/VENV_SUBPROCESS_ANALYSIS.md](../../docs/VENV_SUBPROCESS_ANALYSIS.md)
+
+---
+
 ## 故障排查
 
 ### 问题: 模型加载失败
-**解决方案**: 检查网络连接，Spleeter 首次运行时会自动下载模型文件
+**解决方案**: 检查网络连接，Demucs 首次运行时会自动下载模型文件（约 80MB）
 
 ### 问题: 内存不足 (OOM)
-**解决方案**: 
+**解决方案**:
 1. 确保 `AUDIO_SEPARATOR_MAX_WORKERS=1`
 2. 增加系统内存或使用更小的音频文件
+3. Demucs 模型需要约 1-2GB 内存
 
 ### 问题: ffmpeg 未找到
 **解决方案**: 安装 ffmpeg 并添加到系统 PATH
+
+### 问题: 进程显示系统 Python 路径
+**这不是问题**：参见上方"Windows 本地开发环境"章节
 
 ## 参考文档
 
