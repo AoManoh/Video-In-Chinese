@@ -200,13 +200,16 @@ func (a *AliyunCosyVoiceAdapter) CloneVoice(speakerID, text, referenceAudio, api
 //   - 对 401/429/404 等不可重试错误立即返回，其余错误按策略重试。
 //   - 必须使用 DashScope API 端点，与注册端点保持同一域名。
 func (a *AliyunCosyVoiceAdapter) synthesizeAudio(voiceID, text, apiKey, endpoint string) ([]byte, error) {
-	// 步骤 1: 构建请求体（符合 DashScope API 格式）
-	// 根据官方客服回复，使用扁平结构，字段名为 "voice" 而非 "voice_id"
-	requestBody := AliyunSynthesizeRequest{
-		Model:  "cosyvoice-v3", // 必须指定模型名称
-		Voice:  voiceID,        // 注意：字段名为 "voice"
-		Text:   text,
-		Format: "wav", // 可选：指定音频格式
+	// 步骤 1: 构建请求体
+	// 尝试使用与注册相同的端点格式（使用 action 参数）
+	requestBody := map[string]interface{}{
+		"model": "voice-enrollment",
+		"input": map[string]interface{}{
+			"action":   "synthesize", // 合成操作
+			"voice_id": voiceID,
+			"text":     text,
+			"format":   "wav",
+		},
 	}
 
 	// 步骤 2: 序列化请求体
@@ -215,17 +218,23 @@ func (a *AliyunCosyVoiceAdapter) synthesizeAudio(voiceID, text, apiKey, endpoint
 		return nil, fmt.Errorf("序列化请求体失败: %w", err)
 	}
 
+	// 添加调试日志：打印请求体
+	log.Printf("[AliyunCosyVoiceAdapter] Synthesize request body: %s", string(requestJSON))
+
 	// 步骤 3: 确定 API 端点
-	// 根据官方客服回复，使用 DashScope 公共服务端点
+	// 尝试使用与注册/查询相同的端点（统一使用 customization 端点）
 	apiEndpoint := endpoint
 	if apiEndpoint == "" {
-		// 从环境变量读取默认端点，如果未设置则使用阿里云官方 DashScope 端点
+		// 从环境变量读取默认端点，如果未设置则使用与注册相同的端点
 		apiEndpoint = os.Getenv("ALIYUN_COSYVOICE_ENDPOINT")
 		if apiEndpoint == "" {
-			// 官方正确端点（与注册端点同域名，仅路径不同）
-			apiEndpoint = "https://dashscope.aliyuncs.com/api/v1/audio/tts"
+			// 尝试使用与注册相同的 customization 端点
+			apiEndpoint = "https://dashscope.aliyuncs.com/api/v1/services/audio/tts/customization"
 		}
 	}
+
+	// 添加调试日志：打印实际使用的端点
+	log.Printf("[AliyunCosyVoiceAdapter] Synthesize API endpoint: %s", apiEndpoint)
 
 	// 步骤 4: 发送 HTTP POST 请求（带重试逻辑）
 	var response *AliyunSynthesizeResponse
@@ -303,6 +312,9 @@ func (a *AliyunCosyVoiceAdapter) sendSynthesizeRequest(endpoint string, requestJ
 	if err != nil {
 		return nil, fmt.Errorf("读取响应体失败: %w", err)
 	}
+
+	// 添加调试日志：打印响应状态码和响应体
+	log.Printf("[AliyunCosyVoiceAdapter] Synthesize response: status=%d, body=%s", resp.StatusCode, string(responseBody))
 
 	// 检查 HTTP 状态码
 	if resp.StatusCode == 401 || resp.StatusCode == 403 {
