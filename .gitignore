@@ -56,3 +56,32 @@ docs/
 scripts/
 package-lock.json
 notes/
+image/
+
+# AudioSeparator
+server/mcp/audio_separator/pretrained_models/
+server/mcp/audio_separator/__pycache__/
+server/mcp/audio_separator/*.pyc
+server/mcp/audio_separator/test_imports_output.txt
+server/mcp/audio_separator/verify_output*.txt
+
+# Backup directories
+*_backup/
+
+# Model files
+model.*
+
+# Temporary files
+PR_DIFF_*.txt
+PR_*.md
+submit_pr*.ps1
+cleanup_after_pr.ps1
+update_*.ps1
+checkpoint
+._checkpoint
+fix_readme.py
+
+# Test output
+mp_test.txt
+extensions.txt
+venv_packages.txt

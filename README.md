@@ -211,7 +211,7 @@ $env:REDIS_PASSWORD=""
 $env:REDIS_DB="0"
 
 # 加密密钥
-$env:API_KEY_ENCRYPTION_SECRET="741b79f9796835a806a3b2dc8085a4ffee548b6a87f8a22357ac8dd5382e2668"
+$env:API_KEY_ENCRYPTION_SECRET="YOUR_ENCRYPTION_SECRET"
 
 # 阿里云 OSS（可选）
 $env:ALIYUN_OSS_ACCESS_KEY_ID="..."
@@ -317,7 +317,7 @@ powershell -NoProfile -Command "[Console]::InputEncoding = [Text.UTF8Encoding]::
 启动 AI Adaptor：
 
 ```cmd
-powershell -NoProfile -Command "[Console]::InputEncoding = [Text.UTF8Encoding]::new(`$false); [Console]::OutputEncoding = [Text.UTF8Encoding]::new(`$false); chcp 65001 > `$null; cd 'D:\Go-Project\video-In-Chinese\server\mcp\ai_adaptor'; `$env:REDIS_HOST='127.0.0.1'; `$env:REDIS_PORT='6379'; `$env:REDIS_PASSWORD=''; `$env:REDIS_DB='0'; `$env:API_KEY_ENCRYPTION_SECRET='741b79f9796835a806a3b2dc8085a4ffee548b6a87f8a22357ac8dd5382e2668'; `$env:ALIYUN_OSS_ACCESS_KEY_ID='LTAI5tG1jovKDHXj2RLo1ECh'; `$env:ALIYUN_OSS_ACCESS_KEY_SECRET='l6KJqCF35AjTEhp5aQqsoez78xQDXO'; `$env:ALIYUN_OSS_BUCKET_NAME='video-in-chinese-temp'; `$env:ALIYUN_OSS_ENDPOINT='oss-cn-beijing.aliyuncs.com'; go run . -f etc/ai_adaptor.yaml"
+powershell -NoProfile -Command "[Console]::InputEncoding = [Text.UTF8Encoding]::new(`$false); [Console]::OutputEncoding = [Text.UTF8Encoding]::new(`$false); chcp 65001 > `$null; cd 'D:\Go-Project\video-In-Chinese\server\mcp\ai_adaptor'; `$env:REDIS_HOST='127.0.0.1'; `$env:REDIS_PORT='6379'; `$env:REDIS_PASSWORD=''; `$env:REDIS_DB='0'; `$env:API_KEY_ENCRYPTION_SECRET='YOUR_ENCRYPTION_SECRET'; `$env:ALIYUN_OSS_ACCESS_KEY_ID='YOUR_ACCESS_KEY_ID'; `$env:ALIYUN_OSS_ACCESS_KEY_SECRET='YOUR_ACCESS_KEY_SECRET'; `$env:ALIYUN_OSS_BUCKET_NAME='your-bucket-name'; `$env:ALIYUN_OSS_ENDPOINT='oss-cn-beijing.aliyuncs.com'; go run . -f etc/ai_adaptor.yaml"
 ```
 
 启动 Gateway：
