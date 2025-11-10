@@ -5,11 +5,24 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"time"
 
 	"video-in-chinese/server/mcp/processor/internal/mediautil"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )
+
+// SegmentWithPath represents a segment with timing information (to avoid circular import)
+type SegmentWithPath struct {
+	Start float64
+	End   float64
+}
+
+// concatItem represents an audio file with optional silence gap after it
+type concatItem struct {
+	AudioPath string
+	GapAfter  time.Duration
+}
 
 // ConcatenateAudio concatenates audio segments in chronological order.
 //
@@ -149,5 +162,142 @@ func (c *Composer) runFFmpegConcat(concatFilePath, outputPath string) error {
 	}
 
 	logx.Infof("[Composer] Concatenated audio saved to %s", outputPath)
+	return nil
+}
+
+// ConcatenateAudioWithTiming concatenates audio segments preserving original timing and gaps.
+//
+// This function is the core of Scheme B: each segment is already speed-adjusted to match
+// its original duration. This function simply concatenates them with proper gaps inserted
+// to preserve the original timing structure.
+//
+// Parameters:
+//   - adjustedSegments: audio segments that have been speed-adjusted to match original duration
+//   - originalSegments: original timing information (Start/End timestamps)
+//   - outputPath: path to save the concatenated audio
+//
+// Returns:
+//   - error: error if concatenation fails or invalid timing detected
+func (c *Composer) ConcatenateAudioWithTiming(
+	adjustedSegments []AudioSegment,
+	originalSegments []SegmentWithPath,
+	outputPath string,
+) error {
+	if len(adjustedSegments) == 0 {
+		logx.Error("[Composer] No audio segments to concatenate")
+		return fmt.Errorf("no audio segments to concatenate")
+	}
+
+	if len(adjustedSegments) != len(originalSegments) {
+		return fmt.Errorf(
+			"segment count mismatch: adjustedSegments=%d, originalSegments=%d",
+			len(adjustedSegments), len(originalSegments),
+		)
+	}
+
+	logx.Infof("[Composer] Concatenating %d segments with original timing", len(adjustedSegments))
+
+	// Build concat list with gaps
+	concatItems := make([]concatItem, 0, len(adjustedSegments))
+
+	for i := range adjustedSegments {
+		// Calculate gap until next segment
+		var gap time.Duration
+		if i < len(adjustedSegments)-1 {
+			currentEnd := originalSegments[i].End
+			nextStart := originalSegments[i+1].Start
+			gapSeconds := nextStart - currentEnd
+
+			// Validate: gap must be non-negative
+			if gapSeconds < 0 {
+				return fmt.Errorf(
+					"invalid ASR timing: segment %d ends at %.3fs but segment %d starts at %.3fs (overlap of %.3fs). "+
+					"This indicates ASR timestamp error",
+					i, currentEnd, i+1, nextStart, -gapSeconds,
+				)
+			}
+
+			gap = time.Duration(gapSeconds * float64(time.Second))
+			logx.Infof("[Composer] Segment %d: gap after = %.3fs", i, gap.Seconds())
+		}
+
+		concatItems = append(concatItems, concatItem{
+			AudioPath: adjustedSegments[i].FilePath,
+			GapAfter:  gap,
+		})
+	}
+
+	// If only one segment with no gap, just copy it
+	if len(concatItems) == 1 && concatItems[0].GapAfter == 0 {
+		return c.copySingleSegment(concatItems[0].AudioPath, outputPath)
+	}
+
+	// Create concat file with silence gaps
+	return c.concatWithGaps(concatItems, outputPath)
+}
+
+// concatWithGaps concatenates audio files with silence gaps inserted between them
+func (c *Composer) concatWithGaps(items []concatItem, outputPath string) error {
+	// Create temporary directory for intermediate files
+	tmpDir := filepath.Join(os.TempDir(), "audio_concat")
+	if err := os.MkdirAll(tmpDir, 0755); err != nil {
+		return fmt.Errorf("failed to create temp directory: %w", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Create concat list file
+	concatListPath := filepath.Join(tmpDir, "concat_list.txt")
+	file, err := os.Create(concatListPath)
+	if err != nil {
+		return fmt.Errorf("failed to create concat list: %w", err)
+	}
+	defer file.Close()
+
+	// Write each audio file and gap (as silence)
+	for i, item := range items {
+		// Add audio file
+		absPath, err := filepath.Abs(item.AudioPath)
+		if err != nil {
+			return fmt.Errorf("failed to get absolute path for %s: %w", item.AudioPath, err)
+		}
+		fmt.Fprintf(file, "file '%s'\n", absPath)
+
+		// Add silence gap if needed
+		if item.GapAfter > 0 {
+			silencePath := filepath.Join(tmpDir, fmt.Sprintf("silence_%d.wav", i))
+			if err := c.generateSilence(item.GapAfter, silencePath); err != nil {
+				return fmt.Errorf("failed to generate silence for segment %d: %w", i, err)
+			}
+			absSilencePath, _ := filepath.Abs(silencePath)
+			fmt.Fprintf(file, "file '%s'\n", absSilencePath)
+		}
+	}
+
+	file.Close()
+
+	// Run FFmpeg concat
+	return c.runFFmpegConcat(concatListPath, outputPath)
+}
+
+// generateSilence generates a silence audio file with the specified duration
+func (c *Composer) generateSilence(duration time.Duration, outputPath string) error {
+	durationSec := duration.Seconds()
+	
+	// ffmpeg -f lavfi -i anullsrc=r=44100:cl=stereo -t <duration> <output>
+	cmd := mediautil.NewFFmpegCommand(
+		"-f", "lavfi",
+		"-i", "anullsrc=r=44100:cl=stereo",
+		"-t", fmt.Sprintf("%.3f", durationSec),
+		"-y",
+		outputPath,
+	)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		logx.Errorf("[Composer] Failed to generate silence: %v, output: %s", err, string(output))
+		return fmt.Errorf("failed to generate silence: %w", err)
+	}
+
+	logx.Infof("[Composer] Generated %.3fs silence at %s", durationSec, outputPath)
 	return nil
 }
