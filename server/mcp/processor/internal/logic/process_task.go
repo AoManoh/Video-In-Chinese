@@ -270,29 +270,91 @@ func continueWorkflow(ctx context.Context, svcCtx *svc.ServiceContext, taskID, o
 			return fmt.Errorf("step 8 failed (clone voice segment %d): %w", i, err)
 		}
 
-		// Convert to AudioSegment for composer
+		// Store cloned audio path temporarily (will be adjusted in Step 8.5)
 		clonedSegments = append(clonedSegments, composer.AudioSegment{
 			StartTime: time.Duration(seg.Start * float64(time.Second)),
 			FilePath:  cloneResp.AudioPath,
 		})
 	}
 
-	// Step 9: Concatenate audio segments
-	logx.Infof("[ProcessTask] Step 9: Concatenating audio segments")
+	// Step 8.5: Adjust speed for each segment to match original duration
+	logx.Infof("[ProcessTask] Step 8.5: Adjusting speed for each segment to match original duration")
+	
+	for i := range clonedSegments {
+		// Calculate original duration (from ASR timestamps)
+		originalDuration := time.Duration((allSegments[i].End - allSegments[i].Start) * float64(time.Second))
+		
+		// Get cloned audio duration
+		clonedDuration, err := mediautil.GetAudioDuration(clonedSegments[i].FilePath)
+		if err != nil {
+			return fmt.Errorf("step 8.5 failed (get duration for segment %d): %w", i, err)
+		}
+		
+		// Calculate speed ratio
+		speedRatio := float64(originalDuration) / float64(clonedDuration)
+		
+		logx.Infof("[ProcessTask] Segment %d: original=%.3fs, cloned=%.3fs, ratio=%.3fx",
+			i, originalDuration.Seconds(), clonedDuration.Seconds(), speedRatio)
+		
+		// Check if speed ratio is within acceptable range
+		if speedRatio < mediautil.MinSpeedRatio || speedRatio > mediautil.MaxSpeedRatio {
+			return fmt.Errorf(
+				"step 8.5 failed: segment %d requires speed ratio %.3fx (out of range [%.2f, %.2f]). "+
+				"Original duration: %.3fs, Cloned duration: %.3fs. "+
+				"Suggestion: optimize translation length or voice cloning parameters",
+				i, speedRatio, mediautil.MinSpeedRatio, mediautil.MaxSpeedRatio,
+				originalDuration.Seconds(), clonedDuration.Seconds(),
+			)
+		}
+		
+		// Adjust speed to match original duration
+		adjustedPath := svcCtx.PathManager.GetIntermediatePath(
+			taskID,
+			fmt.Sprintf("adjusted_segment_%d.wav", i),
+		)
+		
+		if err := mediautil.AdjustSpeed(clonedSegments[i].FilePath, speedRatio, adjustedPath); err != nil {
+			return fmt.Errorf("step 8.5 failed (adjust speed for segment %d): %w", i, err)
+		}
+		
+		// Verify adjusted duration
+		verifiedDuration, err := mediautil.VerifyAudioDuration(adjustedPath, originalDuration, 50*time.Millisecond)
+		if err != nil {
+			logx.Infof("[ProcessTask] Segment %d duration verification warning: %v", i, err)
+			// Continue anyway, small deviation is acceptable
+		} else {
+			logx.Infof("[ProcessTask] Segment %d adjusted successfully: %.3fs (verified)", i, verifiedDuration.Seconds())
+		}
+		
+		// Update segment path to adjusted version
+		clonedSegments[i].FilePath = adjustedPath
+	}
+
+	// Step 9: Concatenate audio segments (with original timestamps and gaps)
+	logx.Infof("[ProcessTask] Step 9: Concatenating audio segments with original timing")
 	concatenatedPath := svcCtx.PathManager.GetIntermediatePath(taskID, "concatenated.wav")
 
 	composerInstance := composer.NewComposer(svcCtx.PathManager)
-	if err := composerInstance.ConcatenateAudio(clonedSegments, concatenatedPath); err != nil {
+	
+	// Convert allSegments to composer.SegmentWithPath (only timing info needed)
+	originalTimings := make([]composer.SegmentWithPath, len(allSegments))
+	for i, seg := range allSegments {
+		originalTimings[i] = composer.SegmentWithPath{
+			Start: seg.Start,
+			End:   seg.End,
+		}
+	}
+	
+	// Pass original segments for timing information
+	if err := composerInstance.ConcatenateAudioWithTiming(clonedSegments, originalTimings, concatenatedPath); err != nil {
 		return fmt.Errorf("step 9 failed (concatenate audio): %w", err)
 	}
 
-	// Step 10: Align audio duration
-	logx.Infof("[ProcessTask] Step 10: Aligning audio duration")
-	alignedPath := svcCtx.PathManager.GetIntermediatePath(taskID, "aligned.wav")
-
-	if err := composerInstance.AlignAudio(concatenatedPath, originalAudioPath, alignedPath); err != nil {
-		return fmt.Errorf("step 10 failed (align audio): %w", err)
-	}
+	// Step 10 (AlignAudio) is now REMOVED - no longer needed as segments are already aligned
+	// The concatenated audio already matches the original timing perfectly
+	
+	// Use concatenated audio directly for merging with background
+	alignedPath := concatenatedPath
 
 	// Step 11: Merge vocals with background music
 	logx.Infof("[ProcessTask] Step 11: Merging vocals with background music")

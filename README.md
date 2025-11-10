@@ -317,7 +317,12 @@ powershell -NoProfile -Command "[Console]::InputEncoding = [Text.UTF8Encoding]::
 启动 AI Adaptor：
 
 ```cmd
-powershell -NoProfile -Command "[Console]::InputEncoding = [Text.UTF8Encoding]::new(`$false); [Console]::OutputEncoding = [Text.UTF8Encoding]::new(`$false); chcp 65001 > `$null; cd 'D:\Go-Project\video-In-Chinese\server\mcp\ai_adaptor'; `$env:REDIS_HOST='127.0.0.1'; `$env:REDIS_PORT='6379'; `$env:REDIS_PASSWORD=''; `$env:REDIS_DB='0'; `$env:API_KEY_ENCRYPTION_SECRET='YOUR_ENCRYPTION_SECRET'; `$env:ALIYUN_OSS_ACCESS_KEY_ID='YOUR_ACCESS_KEY_ID'; `$env:ALIYUN_OSS_ACCESS_KEY_SECRET='YOUR_ACCESS_KEY_SECRET'; `$env:ALIYUN_OSS_BUCKET_NAME='your-bucket-name'; `$env:ALIYUN_OSS_ENDPOINT='oss-cn-beijing.aliyuncs.com'; go run . -f etc/ai_adaptor.yaml"
+执行PowerShell命令，包括以下步骤：
+# 1. 设置UTF-8和chcp
+[Console]::InputEncoding = [Text.UTF8Encoding]::new($false)
+[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
+chcp 65001 > $null
+# 2. 正确加载 server/.env 文件中的OSS及秘钥变量
 ```
 
 启动 Gateway：
