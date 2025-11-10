@@ -372,28 +372,29 @@ func (vm *VoiceManager) PollVoiceStatus(ctx context.Context, voiceID, apiKey, en
 				continue
 			}
 
-			log.Printf("[VoiceManager] Voice status: voice_id=%s, status=%s", voiceID, status)
+		log.Printf("[VoiceManager] Voice status: voice_id=%s, status=%s", voiceID, status)
 
-			switch status {
-			case "OK":
-				// 音色注册成功
-				log.Printf("[VoiceManager] Voice registration completed: voice_id=%s", voiceID)
-				return nil
+		switch status {
+		case "OK":
+			// 音色可用（审核通过）
+			log.Printf("[VoiceManager] Voice registration completed: voice_id=%s", voiceID)
+			return nil
 
-			case "FAILED":
-				// 音色注册失败
-				log.Printf("[VoiceManager] ERROR: Voice registration failed: voice_id=%s", voiceID)
-				return fmt.Errorf("voice registration failed: status=FAILED")
+		case "DEPLOYING":
+			// 音色审核中，继续轮询
+			log.Printf("[VoiceManager] Voice is deploying, continue polling: voice_id=%s", voiceID)
+			continue
 
-			case "PROCESSING":
-				// 继续轮询
-				continue
+		case "UNDEPLOYED":
+			// 音色不可用（审核未通过或已下线）
+			log.Printf("[VoiceManager] ERROR: Voice is undeployed: voice_id=%s", voiceID)
+			return fmt.Errorf("voice registration failed: status=UNDEPLOYED")
 
-			default:
-				// 未知状态
-				log.Printf("[VoiceManager] WARNING: Unknown voice status: voice_id=%s, status=%s", voiceID, status)
-				continue
-			}
+		default:
+			// 未知状态，记录警告并继续轮询
+			log.Printf("[VoiceManager] WARNING: Unknown voice status: voice_id=%s, status=%s", voiceID, status)
+			continue
+		}
 		}
 	}
 }
@@ -487,16 +488,21 @@ func (vm *VoiceManager) HandleVoiceNotFound(ctx context.Context, speakerID, refe
 func (vm *VoiceManager) createVoice(ctx context.Context, publicURL, apiKey, endpoint string) (string, error) {
 	log.Printf("[VoiceManager] Creating voice with reference audio: url=%s", publicURL)
 
-	// 确定 API 端点
+	// 确定 API 端点（根据官方客服回复）
 	apiEndpoint := endpoint
 	if apiEndpoint == "" {
-		apiEndpoint = "https://nls-gateway.cn-shanghai.aliyuncs.com/cosyvoice/v1/voices"
+		apiEndpoint = "https://dashscope.aliyuncs.com/api/v1/services/audio/tts/customization"
 	}
 
-	// 构建请求体
+	// 构建请求体（严格按照官方客服示例格式）
 	requestBody := map[string]interface{}{
-		"reference_audio_url": publicURL,
-		"speaker_name":        "speaker_" + time.Now().Format("20060102150405"),
+		"model": "voice-enrollment",
+		"input": map[string]interface{}{
+			"action":       "create_voice",
+			"target_model": "cosyvoice-v3", // 必须与合成时使用的模型一致
+			"prefix":       "speaker",      // 音色ID前缀（仅小写字母和数字）
+			"url":          publicURL,      // 参考音频的公网URL
+		},
 	}
 
 	requestJSON, err := json.Marshal(requestBody)
@@ -533,16 +539,24 @@ func (vm *VoiceManager) createVoice(ctx context.Context, publicURL, apiKey, endp
 		return "", fmt.Errorf("API 返回错误状态码 %d: %s", resp.StatusCode, string(body))
 	}
 
-	// 解析响应
-	var response map[string]interface{}
+	// 解析响应（严格按照官方响应格式）
+	var response struct {
+		Output struct {
+			VoiceID string `json:"voice_id"`
+		} `json:"output"`
+		Usage struct {
+			Count int `json:"count"`
+		} `json:"usage"`
+		RequestID string `json:"request_id"`
+	}
 	if err := json.Unmarshal(body, &response); err != nil {
-		return "", fmt.Errorf("解析响应失败: %w", err)
+		return "", fmt.Errorf("解析响应失败: %w, 响应体: %s", err, string(body))
 	}
 
-	// 提取音色 ID
-	voiceID, ok := response["voice_id"].(string)
-	if !ok {
-		return "", fmt.Errorf("响应中缺少 voice_id 字段")
+	// 提取音色 ID（从 output.voice_id 字段）
+	voiceID := response.Output.VoiceID
+	if voiceID == "" {
+		return "", fmt.Errorf("响应中缺少 voice_id 字段: %s", string(body))
 	}
 
 	log.Printf("[VoiceManager] Voice created successfully: voice_id=%s", voiceID)
@@ -581,21 +595,34 @@ func (vm *VoiceManager) createVoice(ctx context.Context, publicURL, apiKey, endp
 func (vm *VoiceManager) getVoiceStatus(ctx context.Context, voiceID, apiKey, endpoint string) (string, error) {
 	log.Printf("[VoiceManager] Querying voice status: voice_id=%s", voiceID)
 
-	// 确定 API 端点
+	// 确定 API 端点（根据官方客服回复，使用与创建相同的端点）
 	apiEndpoint := endpoint
 	if apiEndpoint == "" {
-		apiEndpoint = "https://nls-gateway.cn-shanghai.aliyuncs.com/cosyvoice/v1/voices/" + voiceID
-	} else {
-		apiEndpoint = apiEndpoint + "/" + voiceID
+		apiEndpoint = "https://dashscope.aliyuncs.com/api/v1/services/audio/tts/customization"
 	}
 
-	// 创建 HTTP 请求
-	req, err := http.NewRequestWithContext(ctx, "GET", apiEndpoint, nil)
+	// 构建请求体（严格按照官方客服示例格式，使用 query_voice action）
+	requestBody := map[string]interface{}{
+		"model": "voice-enrollment",
+		"input": map[string]interface{}{
+			"action":   "query_voice",
+			"voice_id": voiceID,
+		},
+	}
+
+	requestJSON, err := json.Marshal(requestBody)
+	if err != nil {
+		return "", fmt.Errorf("序列化请求体失败: %w", err)
+	}
+
+	// 创建 HTTP 请求（使用 POST 方法，而非 GET）
+	req, err := http.NewRequestWithContext(ctx, "POST", apiEndpoint, bytes.NewBuffer(requestJSON))
 	if err != nil {
 		return "", fmt.Errorf("创建 HTTP 请求失败: %w", err)
 	}
 
 	// 设置请求头
+	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+apiKey)
 
 	// 发送请求
@@ -617,16 +644,28 @@ func (vm *VoiceManager) getVoiceStatus(ctx context.Context, voiceID, apiKey, end
 		return "", fmt.Errorf("API 返回错误状态码 %d: %s", resp.StatusCode, string(body))
 	}
 
-	// 解析响应
-	var response map[string]interface{}
+	// 解析响应（严格按照官方响应格式）
+	var response struct {
+		Output struct {
+			Status       string `json:"status"`
+			GmtCreate    string `json:"gmt_create"`
+			GmtModified  string `json:"gmt_modified"`
+			ResourceLink string `json:"resource_link"`
+			TargetModel  string `json:"target_model"`
+		} `json:"output"`
+		Usage struct {
+			Count int `json:"count"`
+		} `json:"usage"`
+		RequestID string `json:"request_id"`
+	}
 	if err := json.Unmarshal(body, &response); err != nil {
-		return "", fmt.Errorf("解析响应失败: %w", err)
+		return "", fmt.Errorf("解析响应失败: %w, 响应体: %s", err, string(body))
 	}
 
-	// 提取状态
-	status, ok := response["status"].(string)
-	if !ok {
-		return "", fmt.Errorf("响应中缺少 status 字段")
+	// 提取状态（从 output.status 字段）
+	status := response.Output.Status
+	if status == "" {
+		return "", fmt.Errorf("响应中缺少 status 字段: %s", string(body))
 	}
 
 	log.Printf("[VoiceManager] Voice status: voice_id=%s, status=%s", voiceID, status)

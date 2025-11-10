@@ -74,10 +74,12 @@ func NewAliyunCosyVoiceAdapter(voiceManager *voice_cache.VoiceManager) *AliyunCo
 }
 
 // AliyunSynthesizeRequest 阿里云音频合成请求结构
+// 根据官方客服提供的示例，字段名应为 "voice" 而非 "voice_id"
 type AliyunSynthesizeRequest struct {
-	VoiceID string `json:"voice_id"` // 音色 ID
-	Text    string `json:"text"`     // 要合成的文本
-	Format  string `json:"format"`   // 音频格式（如 "wav", "mp3"）
+	Model  string `json:"model"`            // 模型名称，固定为 "cosyvoice-v3"
+	Voice  string `json:"voice"`            // 音色 ID（注意：字段名为 "voice"）
+	Text   string `json:"text"`             // 要合成的文本
+	Format string `json:"format,omitempty"` // 音频格式（可选）
 }
 
 // AliyunSynthesizeResponse 阿里云音频合成响应结构
@@ -180,6 +182,7 @@ func (a *AliyunCosyVoiceAdapter) CloneVoice(speakerID, text, referenceAudio, api
 //
 // 功能说明:
 //   - 构造合成请求、执行带重试的调用，并解析 Base64 音频数据。
+//   - 根据官方客服回复，使用 DashScope API：https://dashscope.aliyuncs.com/api/v1/audio/tts
 //
 // 参数说明:
 //
@@ -195,12 +198,15 @@ func (a *AliyunCosyVoiceAdapter) CloneVoice(speakerID, text, referenceAudio, api
 //
 // 注意事项:
 //   - 对 401/429/404 等不可重试错误立即返回，其余错误按策略重试。
+//   - 必须使用 DashScope API 端点，与注册端点保持同一域名。
 func (a *AliyunCosyVoiceAdapter) synthesizeAudio(voiceID, text, apiKey, endpoint string) ([]byte, error) {
-	// 步骤 1: 构建请求体
+	// 步骤 1: 构建请求体（符合 DashScope API 格式）
+	// 根据官方客服回复，使用扁平结构，字段名为 "voice" 而非 "voice_id"
 	requestBody := AliyunSynthesizeRequest{
-		VoiceID: voiceID,
-		Text:    text,
-		Format:  "wav", // 使用 WAV 格式
+		Model:  "cosyvoice-v3", // 必须指定模型名称
+		Voice:  voiceID,        // 注意：字段名为 "voice"
+		Text:   text,
+		Format: "wav", // 可选：指定音频格式
 	}
 
 	// 步骤 2: 序列化请求体
@@ -210,12 +216,14 @@ func (a *AliyunCosyVoiceAdapter) synthesizeAudio(voiceID, text, apiKey, endpoint
 	}
 
 	// 步骤 3: 确定 API 端点
+	// 根据官方客服回复，使用 DashScope 公共服务端点
 	apiEndpoint := endpoint
 	if apiEndpoint == "" {
-		// 从环境变量读取默认端点，如果未设置则使用阿里云官方端点
+		// 从环境变量读取默认端点，如果未设置则使用阿里云官方 DashScope 端点
 		apiEndpoint = os.Getenv("ALIYUN_COSYVOICE_ENDPOINT")
 		if apiEndpoint == "" {
-			apiEndpoint = "https://nls-gateway.cn-shanghai.aliyuncs.com/cosyvoice/v1/synthesize"
+			// 官方正确端点（与注册端点同域名，仅路径不同）
+			apiEndpoint = "https://dashscope.aliyuncs.com/api/v1/audio/tts"
 		}
 	}
 
