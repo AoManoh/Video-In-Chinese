@@ -75,8 +75,12 @@ func (l *OptimizeLogic) ProcessOptimize(ctx context.Context, req *pb.OptimizeReq
 	// 步骤 2: 从 Redis 读取配置
 	appConfig, err := l.configManager.GetConfig(ctx)
 	if err != nil {
-		log.Printf("[OptimizeLogic] ERROR: Failed to get config: %v", err)
-		return nil, fmt.Errorf("获取配置失败: %w", err)
+		// 降级策略：配置获取失败时，优化服务降级到原文本
+		log.Printf("[OptimizeLogic] WARNING: Failed to get config (will fallback to original text): %v", err)
+		log.Printf("[OptimizeLogic] Degraded: Returning original text due to config failure")
+		return &pb.OptimizeResponse{
+			OptimizedText: req.Text, // 降级到原文本
+		}, nil
 	}
 
 	// 步骤 3: 检查译文优化是否启用
@@ -89,10 +93,16 @@ func (l *OptimizeLogic) ProcessOptimize(ctx context.Context, req *pb.OptimizeReq
 
 	// 步骤 4: 验证译文优化配置
 	if appConfig.OptimizationProvider == "" {
-		return nil, fmt.Errorf("译文优化服务商未配置")
+		log.Printf("[OptimizeLogic] WARNING: Optimization provider not configured, returning original text")
+		return &pb.OptimizeResponse{
+			OptimizedText: req.Text, // 降级到原文本
+		}, nil
 	}
 	if appConfig.OptimizationAPIKey == "" {
-		return nil, fmt.Errorf("译文优化 API 密钥未配置")
+		log.Printf("[OptimizeLogic] WARNING: Optimization API key not configured, returning original text")
+		return &pb.OptimizeResponse{
+			OptimizedText: req.Text, // 降级到原文本
+		}, nil
 	}
 
 	log.Printf("[OptimizeLogic] Using optimization provider: %s", appConfig.OptimizationProvider)
@@ -100,8 +110,12 @@ func (l *OptimizeLogic) ProcessOptimize(ctx context.Context, req *pb.OptimizeReq
 	// 步骤 5: 从适配器注册表获取 LLM 适配器
 	adapter, err := l.registry.GetLLM(appConfig.OptimizationProvider)
 	if err != nil {
-		log.Printf("[OptimizeLogic] ERROR: Failed to get LLM adapter: %v", err)
-		return nil, fmt.Errorf("获取 LLM 适配器失败: %w", err)
+		// 降级策略：适配器获取失败时，降级到原文本
+		log.Printf("[OptimizeLogic] WARNING: Failed to get LLM adapter (will fallback to original text): %v", err)
+		log.Printf("[OptimizeLogic] Degraded: Returning original text due to adapter resolution failure")
+		return &pb.OptimizeResponse{
+			OptimizedText: req.Text, // 降级到原文本
+		}, nil
 	}
 
 	// 步骤 6: 调用适配器执行译文优化

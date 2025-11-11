@@ -70,8 +70,12 @@ func (l *PolishLogic) ProcessPolish(ctx context.Context, req *pb.PolishRequest) 
 	// 步骤 2: 从 Redis 读取配置
 	appConfig, err := l.configManager.GetConfig(ctx)
 	if err != nil {
-		log.Printf("[PolishLogic] ERROR: Failed to get config: %v", err)
-		return nil, fmt.Errorf("获取配置失败: %w", err)
+		// 降级策略：配置获取失败时，润色服务降级到原文本
+		log.Printf("[PolishLogic] WARNING: Failed to get config (will fallback to original text): %v", err)
+		log.Printf("[PolishLogic] Degraded: Returning original text due to config failure")
+		return &pb.PolishResponse{
+			PolishedText: req.Text, // 降级到原文本
+		}, nil
 	}
 
 	// 步骤 3: 检查文本润色是否启用
@@ -84,10 +88,16 @@ func (l *PolishLogic) ProcessPolish(ctx context.Context, req *pb.PolishRequest) 
 
 	// 步骤 4: 验证文本润色配置
 	if appConfig.PolishingProvider == "" {
-		return nil, fmt.Errorf("文本润色服务商未配置")
+		log.Printf("[PolishLogic] WARNING: Polishing provider not configured, returning original text")
+		return &pb.PolishResponse{
+			PolishedText: req.Text, // 降级到原文本
+		}, nil
 	}
 	if appConfig.PolishingAPIKey == "" {
-		return nil, fmt.Errorf("文本润色 API 密钥未配置")
+		log.Printf("[PolishLogic] WARNING: Polishing API key not configured, returning original text")
+		return &pb.PolishResponse{
+			PolishedText: req.Text, // 降级到原文本
+		}, nil
 	}
 
 	log.Printf("[PolishLogic] Using polishing provider: %s", appConfig.PolishingProvider)
@@ -95,8 +105,12 @@ func (l *PolishLogic) ProcessPolish(ctx context.Context, req *pb.PolishRequest) 
 	// 步骤 5: 从适配器注册表获取 LLM 适配器
 	adapter, err := l.registry.GetLLM(appConfig.PolishingProvider)
 	if err != nil {
-		log.Printf("[PolishLogic] ERROR: Failed to get LLM adapter: %v", err)
-		return nil, fmt.Errorf("获取 LLM 适配器失败: %w", err)
+		// 降级策略：适配器获取失败时，降级到原文本
+		log.Printf("[PolishLogic] WARNING: Failed to get LLM adapter (will fallback to original text): %v", err)
+		log.Printf("[PolishLogic] Degraded: Returning original text due to adapter resolution failure")
+		return &pb.PolishResponse{
+			PolishedText: req.Text, // 降级到原文本
+		}, nil
 	}
 
 	// 步骤 6: 调用适配器执行文本润色（带重试机制）
