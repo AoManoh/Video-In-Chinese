@@ -40,15 +40,22 @@ func NewOptimizeLogic(registry *adapters.AdapterRegistry, configManager *config.
 //     from ConfigManager which caches Redis results.
 //  3. Short-circuit with the original text if optimization is disabled.
 //  4. Resolve the adapter from AdapterRegistry and invoke Optimize.
+//  5. On optimization failure (500 errors, timeouts, etc.), gracefully degrade
+//     to the original text instead of failing the entire request.
+//
+// Degradation Strategy:
+//   - Optimization is treated as an enhancement, not a requirement.
+//   - Any optimization failure triggers a fallback to the original text.
+//   - This ensures translation workflows continue even when LLM services are down.
 //
 // Parameters:
 //   - ctx: Carries deadlines/cancellation to the adapter execution.
 //   - req: Protobuf payload describing the text to optimize.
 //
 // Returns:
-//   - *pb.OptimizeResponse with the optimized text on success.
-//   - error describing validation issues, configuration lookup failures,
-//     registry misses, or adapter execution errors.
+//   - *pb.OptimizeResponse with the optimized text on success, or original text
+//     on optimization failure (never fails due to optimization errors).
+//   - error only for validation issues or configuration lookup failures.
 //
 // Example:
 //
@@ -112,8 +119,12 @@ func (l *OptimizeLogic) ProcessOptimize(ctx context.Context, req *pb.OptimizeReq
 		appConfig.OptimizationEndpoint,
 	)
 	if err != nil {
-		log.Printf("[OptimizeLogic] ERROR: Optimization failed: %v", err)
-		return nil, fmt.Errorf("译文优化失败: %w", err)
+		// 降级策略：优化失败时返回原文本，而不是让整个流程失败
+		log.Printf("[OptimizeLogic] WARNING: Optimization failed (will fallback to original text): %v", err)
+		log.Printf("[OptimizeLogic] Degraded: Returning original text due to optimization failure")
+		return &pb.OptimizeResponse{
+			OptimizedText: req.Text, // 降级到原文本
+		}, nil
 	}
 
 	// 步骤 7: 返回结果
