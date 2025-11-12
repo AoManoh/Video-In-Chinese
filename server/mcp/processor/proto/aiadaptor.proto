@@ -57,23 +57,32 @@ message PolishResponse {
 
 // 翻译请求
 message TranslateRequest {
-  string text = 1;        // 原始文本
-  string source_lang = 2; // 源语言（默认 en）
-  string target_lang = 3; // 目标语言（默认 zh）
-  string video_type = 4;  // 视频类型（professional_tech, casual_natural, educational_rigorous, default）
+  string text = 1;        // ԭʼ�ı�
+  string source_lang = 2; // Դ���ԣ�Ĭ�� en��
+  string target_lang = 3; // Ŀ�����ԣ�Ĭ�� zh��
+  string video_type = 4;  // ��Ƶ���ͣ�professional_tech, casual_natural, educational_rigorous, default��
+  double duration_seconds = 5; // ��Ӧԭ�����ʱ��(��)
+  string speaker_role = 6;     // ˵��������ɫ/����
+  uint32 target_word_min = 7;  // Ԥ��͵�������
+  uint32 target_word_max = 8;  // Ԥ��ߵ�������
 }
 
-// 翻译响应
+// ������Ӧ
+
 message TranslateResponse {
   string translated_text = 1; // 翻译后的文本
 }
 
 // 译文优化请求
 message OptimizeRequest {
-  string text = 1; // 翻译后的文本
+  string text = 1; // �������ı�
+  double target_duration_seconds = 2; // ���ĳ���ʱ�䣨�룩
+  uint32 target_word_min = 3;         // Ԥ��͵�������
+  uint32 target_word_max = 4;         // Ԥ��ߵ�������
+  string speaker_role = 5;            // ˵��������ɫ/����
+  string video_type = 6;              // ��Ƶ����Ϣ�������������
 }
 
-// 译文优化响应
 message OptimizeResponse {
   string optimized_text = 1; // 优化后的文本
 }

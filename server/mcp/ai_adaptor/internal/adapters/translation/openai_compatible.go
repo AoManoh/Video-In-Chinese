@@ -4,8 +4,11 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/sashabaranov/go-openai"
+
+	"video-in-chinese/server/mcp/ai_adaptor/internal/adapters"
 )
 
 // OpenAICompatibleTranslationAdapter 封装 OpenAI 兼容格式的翻译 API 调用，实现 TranslationAdapter 接口。
@@ -68,10 +71,11 @@ func NewOpenAICompatibleTranslationAdapter() *OpenAICompatibleTranslationAdapter
 // 设计决策:
 //   - 使用 Chat Completions API 而非专用翻译 API，提供更好的上下文理解和风格控制。
 //   - 温度设置为 0.3，在保证翻译准确性的同时允许适度的表达灵活性。
+//   - 支持动态模型名称，允许用户配置不同的翻译模型。
 //
 // 使用示例:
 //
-//	translated, err := adapter.Translate("Hello, world!", "en", "zh", "professional_tech", apiKey, endpoint)
+//	translated, err := adapter.Translate("Hello, world!", "en", "zh", "professional_tech", "gemini-2.5-flash-lite", apiKey, endpoint)
 //
 // 参数说明:
 //
@@ -79,6 +83,7 @@ func NewOpenAICompatibleTranslationAdapter() *OpenAICompatibleTranslationAdapter
 //	sourceLang string: 源语言代码（如 "en"），可为空（模型自动检测）。
 //	targetLang string: 目标语言代码（如 "zh"），必填。
 //	videoType string: 视频风格标签，用于调整翻译语气（如 "professional_tech", "casual_natural"）。
+//	modelName string: 翻译模型名称（如 "gemini-2.5-flash-lite", "gpt-4o", "qwen-plus"），不能为空。
 //	apiKey string: OpenAI 或兼容服务的 API 密钥。
 //	endpoint string: 自定义 API 地址（如 "https://balance.aomanoh.com/v1"），空字符串使用默认 OpenAI 地址。
 //
@@ -95,10 +100,10 @@ func NewOpenAICompatibleTranslationAdapter() *OpenAICompatibleTranslationAdapter
 //
 // 注意事项:
 //   - 长文本可能触发 Token 限制，调用方应做好分段处理。
-//   - 不同服务的模型名称不同，需要在配置中正确指定（如 "gemini-2.5-pro", "qwen-plus"）。
-func (o *OpenAICompatibleTranslationAdapter) Translate(text, sourceLang, targetLang, videoType, apiKey, endpoint string) (string, error) {
-	log.Printf("[OpenAICompatibleTranslationAdapter] Starting translation: text_length=%d, source=%s, target=%s, videoType=%s",
-		len(text), sourceLang, targetLang, videoType)
+//   - 不同服务的模型名称不同，需要在配置中正确指定（如 "gemini-2.5-flash-lite", "gpt-4o", "qwen-plus"）。
+func (o *OpenAICompatibleTranslationAdapter) Translate(text, sourceLang, targetLang, videoType, modelName, apiKey, endpoint string, extra *adapters.TranslationContext) (string, error) {
+	log.Printf("[OpenAICompatibleTranslationAdapter] Starting translation: text_length=%d, source=%s, target=%s, videoType=%s, model=%s",
+		len(text), sourceLang, targetLang, videoType, modelName)
 
 	// 步骤 1: 验证输入参数
 	if text == "" {
@@ -106,6 +111,9 @@ func (o *OpenAICompatibleTranslationAdapter) Translate(text, sourceLang, targetL
 	}
 	if targetLang == "" {
 		return "", fmt.Errorf("目标语言代码不能为空")
+	}
+	if modelName == "" {
+		return "", fmt.Errorf("模型名称不能为空")
 	}
 	if apiKey == "" {
 		return "", fmt.Errorf("API 密钥不能为空")
@@ -120,8 +128,8 @@ func (o *OpenAICompatibleTranslationAdapter) Translate(text, sourceLang, targetL
 	client := openai.NewClientWithConfig(config)
 
 	// 步骤 3: 构建翻译 Prompt
-	systemPrompt := o.buildSystemPrompt(targetLang, videoType)
-	userPrompt := o.buildUserPrompt(text, sourceLang, targetLang)
+	systemPrompt := o.buildSystemPrompt(targetLang, videoType, extra)
+	userPrompt := o.buildUserPrompt(text, sourceLang, targetLang, extra)
 
 	log.Printf("[OpenAICompatibleTranslationAdapter] System prompt: %s", systemPrompt)
 	log.Printf("[OpenAICompatibleTranslationAdapter] User prompt length: %d", len(userPrompt))
@@ -129,7 +137,7 @@ func (o *OpenAICompatibleTranslationAdapter) Translate(text, sourceLang, targetL
 	// 步骤 4: 调用 OpenAI API
 	ctx := context.Background()
 	request := openai.ChatCompletionRequest{
-		Model: "gemini-2.5-flash", // 默认模型，与润色/优化保持一致
+		Model: modelName, // 使用配置的模型名称
 		Messages: []openai.ChatCompletionMessage{
 			{
 				Role:    openai.ChatMessageRoleSystem,
@@ -175,59 +183,38 @@ func (o *OpenAICompatibleTranslationAdapter) Translate(text, sourceLang, targetL
 // 返回值说明:
 //
 //	string: 系统提示词。
-func (o *OpenAICompatibleTranslationAdapter) buildSystemPrompt(targetLang, videoType string) string {
-	// 基础角色定义
-	basePrompt := "你是一位专业的翻译专家，擅长将各种语言的文本准确、流畅地翻译成目标语言。"
-
-	// 根据视频类型调整翻译风格
-	styleGuide := ""
-	switch videoType {
-	case "professional_tech":
-		styleGuide = "请使用专业、准确的技术术语，保持正式的语气。"
-	case "casual_natural":
-		styleGuide = "请使用轻松、自然的口语化表达，让翻译更贴近日常对话。"
-	case "educational_rigorous":
-		styleGuide = "请使用严谨、清晰的教育性语言，确保概念表达准确。"
-	case "entertainment_lively":
-		styleGuide = "请使用生动、活泼的表达方式，让翻译更有趣味性。"
-	default:
-		styleGuide = "请保持翻译的准确性和流畅性。"
+func (o *OpenAICompatibleTranslationAdapter) buildSystemPrompt(targetLang, videoType string, extra *adapters.TranslationContext) string {
+	var b strings.Builder
+	b.WriteString("你是一名专业的影视剧本翻译专家，需要将对白翻译成自然的目标语言。\n")
+	b.WriteString("请遵循以下约束：\n")
+	b.WriteString(fmt.Sprintf("- 输出语言：%s\n", getLanguageName(targetLang)))
+	b.WriteString(fmt.Sprintf("- 视频风格：%s\n", videoType))
+	if extra != nil && extra.DurationSeconds > 0 {
+		b.WriteString(fmt.Sprintf("- 朗读时长需接近 %.2f 秒\n", extra.DurationSeconds))
 	}
-
-	// 翻译要求
-	requirements := fmt.Sprintf(`
-翻译要求：
-1. 准确传达原文的意思，不要遗漏或添加信息
-2. 使用地道的%s表达，符合目标语言的习惯
-3. 保持原文的语气和风格
-4. %s
-5. 只返回翻译结果，不要包含任何解释或说明
-`, getLanguageName(targetLang), styleGuide)
-
-	return basePrompt + requirements
+	if extra != nil && extra.TargetWordMin > 0 && extra.TargetWordMax > 0 {
+		b.WriteString(fmt.Sprintf("- 字数控制在 %d-%d 字之间\n", extra.TargetWordMin, extra.TargetWordMax))
+	}
+	if extra != nil && extra.SpeakerRole != "" {
+		b.WriteString(fmt.Sprintf("- 说话人角色：%s\n", extra.SpeakerRole))
+	}
+	b.WriteString("- 保持口语化语气，不要添加额外解释或注释。")
+	return b.String()
 }
 
-// buildUserPrompt 构建用户提示词，包含待翻译文本和语言信息。
-//
-// 功能说明:
-//   - 明确指定源语言和目标语言，引导模型进行翻译。
-//
-// 参数说明:
-//
-//	text string: 待翻译文本。
-//	sourceLang string: 源语言代码。
-//	targetLang string: 目标语言代码。
-//
-// 返回值说明:
-//
-//	string: 用户提示词。
-func (o *OpenAICompatibleTranslationAdapter) buildUserPrompt(text, sourceLang, targetLang string) string {
+func (o *OpenAICompatibleTranslationAdapter) buildUserPrompt(text, sourceLang, targetLang string, extra *adapters.TranslationContext) string {
+	var b strings.Builder
 	if sourceLang != "" {
-		return fmt.Sprintf("请将以下%s文本翻译成%s：\n\n%s",
-			getLanguageName(sourceLang), getLanguageName(targetLang), text)
+		b.WriteString(fmt.Sprintf("请将以下%s文本翻译成%s：\n", getLanguageName(sourceLang), getLanguageName(targetLang)))
+	} else {
+		b.WriteString(fmt.Sprintf("请将以下文本翻译成%s：\n", getLanguageName(targetLang)))
 	}
-	return fmt.Sprintf("请将以下文本翻译成%s：\n\n%s",
-		getLanguageName(targetLang), text)
+	if extra != nil && (extra.TargetWordMin > 0 || extra.TargetWordMax > 0 || extra.DurationSeconds > 0) {
+		b.WriteString("需满足上述时长与字数约束。\n")
+	}
+	b.WriteString("\n")
+	b.WriteString(text)
+	return b.String()
 }
 
 // getLanguageName 将语言代码转换为中文名称。

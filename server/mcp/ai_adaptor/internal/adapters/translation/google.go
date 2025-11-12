@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"time"
 
+	"video-in-chinese/server/mcp/ai_adaptor/internal/adapters"
 	"video-in-chinese/server/mcp/ai_adaptor/internal/utils"
 )
 
@@ -106,10 +107,11 @@ type GoogleTranslation struct {
 // 设计决策:
 //   - 使用 v2 接口的 `nmt` 模型以获得更佳翻译质量。
 //   - videoType 参数预留给后续扩展（例如 Glossary），当前不直接使用。
+//   - modelName 参数在 Google Translation API 中不使用，忽略该参数。
 //
 // 使用示例:
 //
-//	translated, err := adapter.Translate("Hello", "en", "zh", "default", apiKey, "")
+//	translated, err := adapter.Translate("Hello", "en", "zh", "default", "", apiKey, "")
 //
 // 参数说明:
 //
@@ -117,6 +119,7 @@ type GoogleTranslation struct {
 //	sourceLang string: 源语言代码，若为空将由 API 自动检测。
 //	targetLang string: 目标语言代码，必填。
 //	videoType string: 视频语气标签（预留扩展）。
+//	modelName string: 模型名称（Google Translation API 中忽略此参数）。
 //	apiKey string: Google Cloud API Key。
 //	endpoint string: 可选自定义端点，空字符串使用默认 URL。
 //
@@ -132,8 +135,8 @@ type GoogleTranslation struct {
 // 注意事项:
 //   - API 有长度限制，超长文本需调用方拆分处理。
 //   - 建议调用方结合重试与熔断策略应对配额限制。
-func (g *GoogleTranslationAdapter) Translate(text, sourceLang, targetLang, videoType, apiKey, endpoint string) (string, error) {
-	log.Printf("[GoogleTranslationAdapter] Starting translation: source=%s, target=%s, video_type=%s", sourceLang, targetLang, videoType)
+func (g *GoogleTranslationAdapter) Translate(text, sourceLang, targetLang, videoType, modelName, apiKey, endpoint string, _ *adapters.TranslationContext) (string, error) {
+	log.Printf("[GoogleTranslationAdapter] Starting translation: source=%s, target=%s, video_type=%s (modelName ignored for Google API)", sourceLang, targetLang, videoType)
 
 	// 步骤 1: 验证输入参数
 	if text == "" {

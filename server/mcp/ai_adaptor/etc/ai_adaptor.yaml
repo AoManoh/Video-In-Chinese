@@ -34,3 +34,5 @@ APICall:
 Log:
   Level: info               # 日志级别（debug, info, warn, error）
 
+# 声音克隆输出目录（相对于项目根目录）
+ClonedVoiceOutputDir: data/cloned_voices

@@ -2,6 +2,7 @@ package mediautil
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -11,17 +12,46 @@ import (
 )
 
 const (
-	// MinSpeedRatio is the minimum acceptable speed ratio (0.8x = 20% slower)
-	MinSpeedRatio = 0.8
+	// MinSpeedRatio is the minimum acceptable speed ratio (0.35x ≈ 65% slower)
+	// Still conservative enough to avoid unnatural speech after multi-stage atempo processing.
+	MinSpeedRatio = 0.35
 
-	// MaxSpeedRatio is the maximum acceptable speed ratio (1.2x = 20% faster)
-	MaxSpeedRatio = 1.2
+	// MaxSpeedRatio is the maximum acceptable speed ratio (2.5x ≈ 150% faster)
+	// Ratios beyond this tend to introduce artifacts even with chained filters.
+	MaxSpeedRatio = 2.5
+
+	speedRatioTolerance = 0.02
+
+	atempoMinRatio = 0.5
+	atempoMaxRatio = 2.0
 )
+
+// buildAtempoStages decomposes a target ratio into multiple ffmpeg atempo stages,
+// each of which must remain within [0.5, 2.0]. This lets us support ratios outside
+// the native single-filter range by chaining filters (e.g., 0.5 × 0.9 = 0.45).
+func buildAtempoStages(target float64) []float64 {
+	remaining := target
+	stages := make([]float64, 0, 4)
+
+	for remaining < atempoMinRatio {
+		stages = append(stages, atempoMinRatio)
+		remaining = remaining / atempoMinRatio
+	}
+
+	for remaining > atempoMaxRatio {
+		stages = append(stages, atempoMaxRatio)
+		remaining = remaining / atempoMaxRatio
+	}
+
+	stages = append(stages, remaining)
+	return stages
+}
 
 // AdjustSpeed adjusts the playback speed of an audio file using FFmpeg atempo filter.
 //
 // The atempo filter changes the speed without altering the pitch.
-// Note: atempo supports range [0.5, 2.0], but we restrict to [0.8, 1.2] for quality.
+// We chain multiple atempo filters (each within [0.5, 2.0]) so that the overall
+// ratio can safely cover [0.35, 2.5] without re-synthesizing audio upstream.
 //
 // Parameters:
 //   - inputPath: path to the input audio file
@@ -31,28 +61,45 @@ const (
 // Returns:
 //   - error: if speed ratio is out of range or ffmpeg fails
 func AdjustSpeed(inputPath string, speedRatio float64, outputPath string) error {
-	// Validate speed ratio
-	if speedRatio < MinSpeedRatio || speedRatio > MaxSpeedRatio {
+	clampedRatio := speedRatio
+	// Validate speed ratio with tolerance to absorb floating point errors
+	if clampedRatio < MinSpeedRatio-speedRatioTolerance || clampedRatio > MaxSpeedRatio+speedRatioTolerance {
 		return fmt.Errorf(
 			"speed ratio %.3f out of acceptable range [%.2f, %.2f]",
 			speedRatio, MinSpeedRatio, MaxSpeedRatio,
 		)
 	}
 
-	// Special case: if ratio is very close to 1.0, just copy the file
-	if speedRatio >= 0.99 && speedRatio <= 1.01 {
-		logx.Infof("[AdjustSpeed] Speed ratio %.3f is close to 1.0, copying file directly", speedRatio)
-		return CopyAudioFile(inputPath, outputPath)
+	absInputPath, err := ResolveProjectPath(inputPath)
+	if err != nil {
+		return fmt.Errorf("failed to resolve input path: %w", err)
 	}
 
-	logx.Infof("[AdjustSpeed] Adjusting speed: input=%s, ratio=%.3fx, output=%s", inputPath, speedRatio, outputPath)
+	if clampedRatio < MinSpeedRatio {
+		logx.Infof("[AdjustSpeed] Speed ratio %.3f below minimum, clamping to %.3f", clampedRatio, MinSpeedRatio)
+		clampedRatio = MinSpeedRatio
+	}
+	if clampedRatio > MaxSpeedRatio {
+		logx.Infof("[AdjustSpeed] Speed ratio %.3f above maximum, clamping to %.3f", clampedRatio, MaxSpeedRatio)
+		clampedRatio = MaxSpeedRatio
+	}
 
-	// Handle atempo filter limitation: supports [0.5, 2.0] only
-	// For ratios outside this range, we need to chain multiple atempo filters
-	// But our range [0.8, 1.2] is well within [0.5, 2.0], so single filter is enough
+	// Special case: if ratio is very close to 1.0, just copy the file
+	if clampedRatio >= 0.99 && clampedRatio <= 1.01 {
+		logx.Infof("[AdjustSpeed] Speed ratio %.3f is close to 1.0, copying file directly", clampedRatio)
+		return CopyAudioFile(absInputPath, outputPath)
+	}
+
+	stages := buildAtempoStages(clampedRatio)
+	filterExpr := make([]string, len(stages))
+	for i, stage := range stages {
+		filterExpr[i] = fmt.Sprintf("atempo=%.6f", stage)
+	}
+	logx.Infof("[AdjustSpeed] Adjusting speed: input=%s, ratio=%.3fx, stages=%v, output=%s", absInputPath, clampedRatio, stages, outputPath)
+
 	cmd := NewFFmpegCommand(
-		"-i", inputPath,
-		"-filter:a", fmt.Sprintf("atempo=%.6f", speedRatio),
+		"-i", absInputPath,
+		"-filter:a", strings.Join(filterExpr, ","),
 		"-y",
 		outputPath,
 	)
@@ -63,14 +110,19 @@ func AdjustSpeed(inputPath string, speedRatio float64, outputPath string) error 
 		return fmt.Errorf("failed to adjust speed: %w", err)
 	}
 
-	logx.Infof("[AdjustSpeed] Successfully adjusted speed to %.3fx", speedRatio)
+	logx.Infof("[AdjustSpeed] Successfully adjusted speed to %.3fx", clampedRatio)
 	return nil
 }
 
 // CopyAudioFile copies an audio file using FFmpeg to ensure format consistency
 func CopyAudioFile(inputPath, outputPath string) error {
+	absInputPath, err := ResolveProjectPath(inputPath)
+	if err != nil {
+		return fmt.Errorf("failed to resolve input path: %w", err)
+	}
+
 	cmd := NewFFmpegCommand(
-		"-i", inputPath,
+		"-i", absInputPath,
 		"-c", "copy",
 		"-y",
 		outputPath,
@@ -126,14 +178,26 @@ func VerifyAudioDuration(audioPath string, expectedDuration time.Duration, toler
 
 // GetAudioDuration retrieves the duration of an audio file using ffprobe
 func GetAudioDuration(audioPath string) (time.Duration, error) {
+	absPath, err := ResolveProjectPath(audioPath)
+	if err != nil {
+		logx.Errorf("[GetAudioDuration] Failed to resolve audio path %s: %v", audioPath, err)
+		return 0, fmt.Errorf("failed to resolve audio path: %w", err)
+	}
+
 	// Use ffprobe to get audio duration
 	// Note: Must use exec.Command directly, not NewFFmpegCommand (which calls ffmpeg, not ffprobe)
 	cmd := exec.Command("ffprobe",
 		"-v", "error",
 		"-show_entries", "format=duration",
 		"-of", "default=noprint_wrappers=1:nokey=1",
-		audioPath,
+		absPath,
 	)
+
+	// Ensure UTF-8 output on Windows
+	if len(cmd.Env) == 0 {
+		cmd.Env = os.Environ()
+	}
+	cmd.Env = append(cmd.Env, "LANG=en_US.UTF-8")
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {

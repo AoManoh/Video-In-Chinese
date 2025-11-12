@@ -122,8 +122,16 @@ func (l *OptimizeLogic) ProcessOptimize(ctx context.Context, req *pb.OptimizeReq
 	// 获取模型名称，如果未配置则使用默认值
 	modelName := appConfig.OptimizationModelName
 	if modelName == "" {
-		modelName = "gemini-2.5-flash" // 默认使用 Gemini Flash（更快）
+		modelName = "gemini-2.5-flash-lite" // 默认使用 Gemini Flash（更快）
 		log.Printf("[OptimizeLogic] WARNING: No model specified, using default: %s", modelName)
+	}
+
+	optCtx := &adapters.OptimizationContext{
+		TargetDurationSeconds: req.TargetDurationSeconds,
+		TargetWordMin:         req.TargetWordMin,
+		TargetWordMax:         req.TargetWordMax,
+		SpeakerRole:           req.SpeakerRole,
+		VideoType:             req.VideoType,
 	}
 
 	optimizedText, err := adapter.Optimize(
@@ -131,6 +139,7 @@ func (l *OptimizeLogic) ProcessOptimize(ctx context.Context, req *pb.OptimizeReq
 		modelName,
 		appConfig.OptimizationAPIKey,
 		appConfig.OptimizationEndpoint,
+		optCtx,
 	)
 	if err != nil {
 		// 降级策略：优化失败时返回原文本，而不是让整个流程失败

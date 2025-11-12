@@ -6,6 +6,8 @@ import (
 	"log"
 
 	"github.com/sashabaranov/go-openai"
+
+	"video-in-chinese/server/mcp/ai_adaptor/internal/adapters"
 )
 
 // OpenAILLMAdapter 封装 OpenAI Chat Completions API，实现 LLMAdapter 接口。
@@ -77,7 +79,7 @@ func NewOpenAILLMAdapter() *OpenAILLMAdapter {
 //	text string: 待润色文本，不能为空。
 //	videoType string: 视频语气标签，决定系统 Prompt 语气。
 //	customPrompt string: 可选自定义提示词，空字符串使用默认模版。
-//	modelName string: LLM 模型名称（如 "gpt-4o", "gemini-2.5-pro", "gemini-2.5-flash"）。
+//	modelName string: LLM 模型名称（如 "gpt-4o", "gemini-2.5-pro", "gemini-2.5-flash-lite"）。
 //	apiKey string: OpenAI 或兼容代理的鉴权密钥。
 //	endpoint string: 可选自定义 API 地址，留空使用默认 https://api.openai.com。
 //
@@ -119,7 +121,7 @@ func (o *OpenAILLMAdapter) Polish(text, videoType, customPrompt, modelName, apiK
 
 	// 步骤 3: 构建 Prompt
 	systemPrompt := buildPolishPrompt(videoType, customPrompt)
-	userPrompt := fmt.Sprintf("请润色以下文本：\n\n%s", text)
+	userPrompt := fmt.Sprintf("Correct the following ASR transcription:\n\n%s", text)
 
 	log.Printf("[OpenAILLMAdapter] System prompt: %s", systemPrompt)
 	log.Printf("[OpenAILLMAdapter] User prompt length: %d", len(userPrompt))
@@ -178,7 +180,7 @@ func (o *OpenAILLMAdapter) Polish(text, videoType, customPrompt, modelName, apiK
 // 参数说明:
 //
 //	text string: 待优化文本，不能为空。
-//	modelName string: LLM 模型名称（如 "gpt-4o", "gemini-2.5-pro", "gemini-2.5-flash"）。
+//	modelName string: LLM 模型名称（如 "gpt-4o", "gemini-2.5-pro", "gemini-2.5-flash-lite"）。
 //	apiKey string: OpenAI 或兼容代理的鉴权密钥。
 //	endpoint string: 可选自定义 API 地址，留空使用默认 https://api.openai.com。
 //
@@ -195,7 +197,7 @@ func (o *OpenAILLMAdapter) Polish(text, videoType, customPrompt, modelName, apiK
 //
 // 注意事项:
 //   - 输入长度需满足模型上下文限制，调用方可在外层做分页处理。
-func (o *OpenAILLMAdapter) Optimize(text, modelName, apiKey, endpoint string) (string, error) {
+func (o *OpenAILLMAdapter) Optimize(text, modelName, apiKey, endpoint string, optCtx *adapters.OptimizationContext) (string, error) {
 	log.Printf("[OpenAILLMAdapter] Starting translation optimization: model=%s", modelName)
 
 	// 步骤 1: 验证输入参数
@@ -219,14 +221,13 @@ func (o *OpenAILLMAdapter) Optimize(text, modelName, apiKey, endpoint string) (s
 	client := openai.NewClientWithConfig(config)
 
 	// 步骤 3: 构建 Prompt
-	systemPrompt := "你是一位专业的翻译优化专家。请优化以下翻译文本，使其更加流畅、自然、符合中文表达习惯。保持原意不变，只优化表达方式。\n\n重要：请直接返回优化后的文本，不要添加任何解释、说明或多个方案。"
-	userPrompt := fmt.Sprintf("请优化以下翻译文本：\n\n%s", text)
+	systemPrompt, userPrompt := buildOptimizationPrompts(text, optCtx)
 
 	log.Printf("[OpenAILLMAdapter] System prompt: %s", systemPrompt)
 	log.Printf("[OpenAILLMAdapter] User prompt length: %d", len(userPrompt))
 
 	// 步骤 4: 调用 OpenAI API
-	ctx := context.Background()
+	reqCtx := context.Background()
 	request := openai.ChatCompletionRequest{
 		Model: modelName, // 使用配置中的模型名称
 		Messages: []openai.ChatCompletionMessage{
@@ -243,7 +244,7 @@ func (o *OpenAILLMAdapter) Optimize(text, modelName, apiKey, endpoint string) (s
 	}
 
 	log.Printf("[OpenAILLMAdapter] Sending request to API...")
-	response, err := client.CreateChatCompletion(ctx, request)
+	response, err := client.CreateChatCompletion(reqCtx, request)
 	if err != nil {
 		log.Printf("[OpenAILLMAdapter] ERROR: API call failed: %v", err)
 		return "", fmt.Errorf("调用译文优化 API 失败: %w", err)

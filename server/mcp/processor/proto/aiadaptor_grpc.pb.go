@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             v3.19.4
-// source: pb/aiadaptor.proto
+// source: proto/aiadaptor.proto
 
 package proto
 
@@ -283,5 +283,5 @@ var AIAdaptor_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "pb/aiadaptor.proto",
+	Metadata: "proto/aiadaptor.proto",
 }

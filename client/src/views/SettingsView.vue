@@ -305,6 +305,14 @@
 
       <!-- 操作按钮 -->
       <div class="form-actions mt-30">
+        <el-button
+          v-if="isDev"
+          size="large"
+          plain
+          @click="fillPresetConfig"
+        >
+          一键填充配置
+        </el-button>
         <el-button type="primary" size="large" :loading="saving" @click="saveSettings">
           保存配置
         </el-button>
@@ -315,31 +323,22 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { QuestionFilled } from '@element-plus/icons-vue'
 import { getSettings, updateSettings } from '@/api/settings-api'
 import type { GetSettingsResponse, UpdateSettingsRequest } from '@/api/types'
 import { setConfigStatus } from '@/utils/storage'
-import {
-  validateAPIKeyFormat,
-  validateEndpointFormat,
-  validateRequiredConfig,
-  getProviderConfigTips,
-  getConfigErrorSuggestion,
-  validateConfiguration
-} from '@/utils/validation'
+import { validateConfiguration } from '@/utils/validation'
 import axios from 'axios'
 
-const router = useRouter()
 const formRef = ref<FormInstance>()
 
 // 原始配置数据
 const settings = ref<GetSettingsResponse | null>(null)
 
 // 表单数据
-const form = ref<Partial<UpdateSettingsRequest>>({
+const form = ref<Omit<UpdateSettingsRequest, 'version'>>({
   audio_separation_enabled: false,
   polishing_enabled: false,
   optimization_enabled: false,
@@ -347,6 +346,36 @@ const form = ref<Partial<UpdateSettingsRequest>>({
   s2st_provider: '',
   s2st_api_key: ''
 })
+
+const isDev = import.meta.env.DEV
+
+// 预设配置（用于快速填充）
+const presetConfig: Partial<UpdateSettingsRequest> = {
+  processing_mode: 'standard',
+  asr_provider: 'aliyun',
+  asr_api_key: 'sk-c36a30284fa44101a6e1f556e07c9574',
+  asr_endpoint: '',
+  audio_separation_enabled: false,
+  polishing_enabled: true,
+  polishing_provider: 'openai-compatible',
+  polishing_api_key: 'sk-aomanoh',
+  polishing_endpoint: 'https://balance.aomanoh.com/v1',
+  polishing_video_type: '',
+  translation_provider: 'openai-compatible',
+  translation_api_key: 'sk-aomanoh',
+  translation_endpoint: 'https://balance.aomanoh.com/v1',
+  translation_video_type: 'casual_natural',
+  optimization_enabled: true,
+  optimization_provider: 'openai-compatible',
+  optimization_api_key: 'sk-aomanoh',
+  optimization_endpoint: 'https://balance.aomanoh.com/v1',
+  voice_cloning_provider: 'aliyun-cosyvoice',
+  voice_cloning_api_key: 'sk-c36a30284fa44101a6e1f556e07c9574',
+  voice_cloning_endpoint: '',
+  voice_cloning_auto_select_reference: true,
+  s2st_provider: '',
+  s2st_api_key: ''
+}
 
 // 当前版本号
 const currentVersion = ref(0)
@@ -357,7 +386,6 @@ const saving = ref(false)
 
 // 表单验证规则
 const validationRules: FormRules = {
-  asr_provider: [{ required: true, message: '请选择ASR服务商', trigger: 'change' }],
   asr_api_key: [
     { required: true, message: '请输入ASR API密钥', trigger: 'blur' }
   ],
@@ -384,7 +412,6 @@ const loadSettings = async () => {
 
     // 初始化表单数据
     form.value = {
-      version: settings.value.version,
       processing_mode: settings.value.processing_mode,
       asr_provider: settings.value.asr_provider,
       asr_api_key: settings.value.asr_api_key,
@@ -512,8 +539,8 @@ const saveSettings = async () => {
   saving.value = true
   try {
     const request: UpdateSettingsRequest = {
-      version: currentVersion.value,
-      ...form.value
+      ...form.value,
+      version: currentVersion.value
     }
 
     const response = await updateSettings(request)
@@ -535,6 +562,17 @@ const saveSettings = async () => {
   } finally {
     saving.value = false
   }
+}
+
+/**
+ * 一键填充预设配置
+ */
+const fillPresetConfig = () => {
+  form.value = {
+    ...form.value,
+    ...presetConfig
+  }
+  ElMessage.success('已填充预设配置，请检查后保存')
 }
 
 /**

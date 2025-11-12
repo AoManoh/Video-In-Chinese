@@ -110,13 +110,29 @@ func (l *TranslateLogic) ProcessTranslate(ctx context.Context, req *pb.Translate
 		videoType = "default" // 默认视频类型
 	}
 
+	// 使用配置中的模型名称，如果未配置则使用默认值
+	modelName := appConfig.TranslationModelName
+	if modelName == "" {
+		modelName = "gemini-2.5-flash-lite" // 默认模型
+		log.Printf("[TranslateLogic] WARNING: translation_model_name not configured, using default: %s", modelName)
+	}
+
+	translationCtx := &adapters.TranslationContext{
+		DurationSeconds: req.DurationSeconds,
+		SpeakerRole:     req.SpeakerRole,
+		TargetWordMin:   req.TargetWordMin,
+		TargetWordMax:   req.TargetWordMax,
+	}
+
 	translatedText, err := adapter.Translate(
 		req.Text,
 		req.SourceLang,
 		req.TargetLang,
 		videoType,
+		modelName,
 		appConfig.TranslationAPIKey,
 		appConfig.TranslationEndpoint,
+		translationCtx,
 	)
 	if err != nil {
 		log.Printf("[TranslateLogic] ERROR: Translation failed: %v", err)

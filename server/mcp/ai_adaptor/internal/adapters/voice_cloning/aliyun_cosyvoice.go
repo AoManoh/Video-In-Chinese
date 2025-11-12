@@ -3,17 +3,15 @@ package voice_cloning
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
-	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"time"
 
-	"video-in-chinese/server/mcp/ai_adaptor/internal/utils"
 	"video-in-chinese/server/mcp/ai_adaptor/internal/voice_cache"
 )
 
@@ -71,22 +69,6 @@ func NewAliyunCosyVoiceAdapter(voiceManager *voice_cache.VoiceManager) *AliyunCo
 		},
 		voiceManager: voiceManager,
 	}
-}
-
-// AliyunSynthesizeRequest 阿里云音频合成请求结构
-// 根据官方客服提供的示例，字段名应为 "voice" 而非 "voice_id"
-type AliyunSynthesizeRequest struct {
-	Model  string `json:"model"`            // 模型名称，固定为 "cosyvoice-v3"
-	Voice  string `json:"voice"`            // 音色 ID（注意：字段名为 "voice"）
-	Text   string `json:"text"`             // 要合成的文本
-	Format string `json:"format,omitempty"` // 音频格式（可选）
-}
-
-// AliyunSynthesizeResponse 阿里云音频合成响应结构
-type AliyunSynthesizeResponse struct {
-	StatusCode int    `json:"status_code"` // 业务状态码（20000000 表示成功）
-	Message    string `json:"message"`     // 响应消息
-	AudioData  string `json:"audio_data"`  // Base64 编码的音频数据
 }
 
 // CloneVoice 执行声音克隆并返回合成后的音频文件路径。
@@ -178,173 +160,117 @@ func (a *AliyunCosyVoiceAdapter) CloneVoice(speakerID, text, referenceAudio, api
 	return audioPath, nil
 }
 
-// synthesizeAudio 调用阿里云 CosyVoice API 合成音频并返回原始字节。
+// synthesizeAudio 使用指定音色合成音频。
 //
 // 功能说明:
-//   - 构造合成请求、执行带重试的调用，并解析 Base64 音频数据。
-//   - 根据官方客服回复，使用 DashScope API：https://dashscope.aliyuncs.com/api/v1/audio/tts
+//   - 调用 Python 脚本（使用 DashScope SDK）将文本转换为音频。
+//   - 根据官方文档，CosyVoice 语音合成仅支持 WebSocket 或 SDK 调用，不支持 HTTP RESTful。
+//   - 当前实现通过调用 Python 子进程使用官方 SDK，后续可迁移到 WebSocket 方案。
 //
 // 参数说明:
 //
-//	voiceID string: 已注册的音色 ID。
+//	voiceID string: 音色 ID（由 RegisterVoice 返回）。
 //	text string: 待合成文本。
 //	apiKey string: 阿里云 CosyVoice API 密钥。
-//	endpoint string: 可选自定义端点。
+//	endpoint string: 保留参数（当前未使用，为兼容性保留）。
 //
 // 返回值说明:
 //
-//	[]byte: 解码后的音频数据。
-//	error: 请求失败或解码失败时返回。
+//	[]byte: 合成的音频数据。
+//	error: 合成失败时返回。
 //
 // 注意事项:
-//   - 对 401/429/404 等不可重试错误立即返回，其余错误按策略重试。
-//   - 必须使用 DashScope API 端点，与注册端点保持同一域名。
+//   - 需要安装 Python 3 和 dashscope SDK: pip install dashscope
+//   - Python 脚本路径: server/scripts/synthesize_audio.py
 func (a *AliyunCosyVoiceAdapter) synthesizeAudio(voiceID, text, apiKey, endpoint string) ([]byte, error) {
-	// 步骤 1: 构建请求体
-	// 尝试使用与注册相同的端点格式（使用 action 参数）
-	requestBody := map[string]interface{}{
-		"model": "voice-enrollment",
-		"input": map[string]interface{}{
-			"action":   "synthesize", // 合成操作
-			"voice_id": voiceID,
-			"text":     text,
-			"format":   "wav",
-		},
-	}
+	log.Printf("[AliyunCosyVoiceAdapter] Synthesizing audio: voice_id=%s, text_length=%d", voiceID, len(text))
 
-	// 步骤 2: 序列化请求体
-	requestJSON, err := json.Marshal(requestBody)
+	// 步骤 1: 创建临时文件保存音频
+	tempFile, err := os.CreateTemp("", "cosyvoice_*.wav")
 	if err != nil {
-		return nil, fmt.Errorf("序列化请求体失败: %w", err)
+		return nil, fmt.Errorf("创建临时文件失败: %w", err)
 	}
+	tempPath := tempFile.Name()
+	tempFile.Close()
+	defer os.Remove(tempPath) // 确保清理临时文件
 
-	// 添加调试日志：打印请求体
-	log.Printf("[AliyunCosyVoiceAdapter] Synthesize request body: %s", string(requestJSON))
-
-	// 步骤 3: 确定 API 端点
-	// 尝试使用与注册/查询相同的端点（统一使用 customization 端点）
-	apiEndpoint := endpoint
-	if apiEndpoint == "" {
-		// 从环境变量读取默认端点，如果未设置则使用与注册相同的端点
-		apiEndpoint = os.Getenv("ALIYUN_COSYVOICE_ENDPOINT")
-		if apiEndpoint == "" {
-			// 尝试使用与注册相同的 customization 端点
-			apiEndpoint = "https://dashscope.aliyuncs.com/api/v1/services/audio/tts/customization"
-		}
-	}
-
-	// 添加调试日志：打印实际使用的端点
-	log.Printf("[AliyunCosyVoiceAdapter] Synthesize API endpoint: %s", apiEndpoint)
-
-	// 步骤 4: 发送 HTTP POST 请求（带重试逻辑）
-	var response *AliyunSynthesizeResponse
-	var lastErr error
-
-	for retryCount := 0; retryCount <= 3; retryCount++ {
-		if retryCount > 0 {
-			log.Printf("[AliyunCosyVoiceAdapter] Retrying synthesize request (attempt %d/3)", retryCount)
-			time.Sleep(2 * time.Second) // 重试间隔 2 秒
-		}
-
-		response, lastErr = a.sendSynthesizeRequest(apiEndpoint, requestJSON, apiKey)
-		if lastErr == nil {
-			break // 请求成功，退出重试循环
-		}
-
-		// 检查是否为不可重试的错误（401, 429, 404）
-		if utils.IsNonRetryableError(lastErr) {
-			break
-		}
-	}
-
-	if lastErr != nil {
-		return nil, lastErr
-	}
-
-	// 步骤 5: 解码 Base64 音频数据
-	audioData, err := base64.StdEncoding.DecodeString(response.AudioData)
+	// 步骤 1.5: 创建临时文件存储文本（避免Windows命令行参数截断问题）
+	textFile, err := os.CreateTemp("", "cosyvoice_text_*.txt")
 	if err != nil {
-		return nil, fmt.Errorf("解码音频数据失败: %w", err)
+		return nil, fmt.Errorf("创建文本临时文件失败: %w", err)
+	}
+	textPath := textFile.Name()
+	if _, err := textFile.WriteString(text); err != nil {
+		textFile.Close()
+		os.Remove(textPath)
+		return nil, fmt.Errorf("写入文本临时文件失败: %w", err)
+	}
+	textFile.Close()
+	defer os.Remove(textPath) // 确保清理临时文件
+
+	// 步骤 2: 调用 Python 脚本
+	scriptPath := "server/scripts/synthesize_audio.py"
+
+	// 检查脚本是否存在
+	if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
+		return nil, fmt.Errorf("Python 脚本不存在: %s", scriptPath)
+	}
+
+	// 设置超时（最多等待 60 秒）
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	// 构建命令（通过临时文件传递文本，避免命令行参数截断）
+	// 根据操作系统选择Python命令
+	pythonCmd := "python"
+	if runtime.GOOS != "windows" {
+		// 仅在非Windows系统尝试使用python3
+		if _, err := exec.LookPath("python3"); err == nil {
+			pythonCmd = "python3"
+		}
+	}
+	log.Printf("[AliyunCosyVoiceAdapter] Using Python command: %s", pythonCmd)
+	cmd := exec.CommandContext(ctx, pythonCmd, scriptPath, voiceID, textPath, tempPath)
+
+	// 设置环境变量
+	cmd.Env = append(os.Environ(), fmt.Sprintf("DASHSCOPE_API_KEY=%s", apiKey))
+
+	// 捕获标准输出和错误输出
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	// 步骤 3: 执行命令
+	log.Printf("[AliyunCosyVoiceAdapter] Executing Python script: %s", scriptPath)
+	err = cmd.Run()
+
+	// 打印 Python 脚本的输出（用于调试）
+	if stdout.Len() > 0 {
+		log.Printf("[Python stdout] %s", stdout.String())
+	}
+	if stderr.Len() > 0 {
+		log.Printf("[Python stderr] %s", stderr.String())
+	}
+
+	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return nil, fmt.Errorf("Python 脚本执行超时（60秒）")
+		}
+		return nil, fmt.Errorf("Python 脚本执行失败: %w, stderr: %s", err, stderr.String())
+	}
+
+	// 步骤 4: 读取生成的音频文件
+	audioData, err := os.ReadFile(tempPath)
+	if err != nil {
+		return nil, fmt.Errorf("读取音频文件失败: %w", err)
+	}
+
+	if len(audioData) == 0 {
+		return nil, fmt.Errorf("生成的音频文件为空")
 	}
 
 	log.Printf("[AliyunCosyVoiceAdapter] Audio synthesized successfully: size=%d bytes", len(audioData))
 	return audioData, nil
-}
-
-// sendSynthesizeRequest 发送音频合成 HTTP 请求并解析响应。
-//
-// 功能说明:
-//   - 设置认证头，校验 HTTP 状态码并解码为 AliyunSynthesizeResponse。
-//
-// 参数说明:
-//
-//	endpoint string: CosyVoice API URL。
-//	requestJSON []byte: 序列化后的请求体。
-//	apiKey string: 阿里云 CosyVoice API 密钥。
-//
-// 返回值说明:
-//
-//	*AliyunSynthesizeResponse: 成功时返回的响应结构。
-//	error: 网络错误、状态码异常或 JSON 解析失败时返回。
-//
-// 注意事项:
-//   - 针对 401/403、429、404、5xx 等情况提供清晰的错误信息。
-func (a *AliyunCosyVoiceAdapter) sendSynthesizeRequest(endpoint string, requestJSON []byte, apiKey string) (*AliyunSynthesizeResponse, error) {
-	// 创建 HTTP 请求
-	req, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(requestJSON))
-	if err != nil {
-		return nil, fmt.Errorf("创建 HTTP 请求失败: %w", err)
-	}
-
-	// 设置请求头
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+apiKey) // 阿里云认证方式
-
-	// 发送请求
-	resp, err := a.client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("发送 HTTP 请求失败: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// 读取响应体
-	responseBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("读取响应体失败: %w", err)
-	}
-
-	// 添加调试日志：打印响应状态码和响应体
-	log.Printf("[AliyunCosyVoiceAdapter] Synthesize response: status=%d, body=%s", resp.StatusCode, string(responseBody))
-
-	// 检查 HTTP 状态码
-	if resp.StatusCode == 401 || resp.StatusCode == 403 {
-		return nil, fmt.Errorf("API 密钥无效 (HTTP %d): %s", resp.StatusCode, string(responseBody))
-	}
-	if resp.StatusCode == 429 {
-		return nil, fmt.Errorf("API 配额不足 (HTTP 429): %s", string(responseBody))
-	}
-	if resp.StatusCode == 404 {
-		return nil, fmt.Errorf("音色不存在 (HTTP 404): %s", string(responseBody))
-	}
-	if resp.StatusCode >= 500 {
-		return nil, fmt.Errorf("外部 API 服务错误 (HTTP %d): %s", resp.StatusCode, string(responseBody))
-	}
-	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("HTTP 请求失败 (HTTP %d): %s", resp.StatusCode, string(responseBody))
-	}
-
-	// 解析 JSON 响应
-	var synthesizeResponse AliyunSynthesizeResponse
-	if err := json.Unmarshal(responseBody, &synthesizeResponse); err != nil {
-		return nil, fmt.Errorf("解析 JSON 响应失败: %w, 响应体: %s", err, string(responseBody))
-	}
-
-	// 检查业务状态码
-	if synthesizeResponse.StatusCode != 20000000 {
-		return nil, fmt.Errorf("音频合成失败 (业务状态码 %d): %s", synthesizeResponse.StatusCode, synthesizeResponse.Message)
-	}
-
-	return &synthesizeResponse, nil
 }
 
 // saveAudioFile 将合成的音频数据写入本地文件并返回路径。
@@ -369,7 +295,7 @@ func (a *AliyunCosyVoiceAdapter) saveAudioFile(audioData []byte, speakerID strin
 	// 从环境变量读取输出目录，如果未设置则使用默认值
 	outputDir := os.Getenv("CLONED_VOICE_OUTPUT_DIR")
 	if outputDir == "" {
-		outputDir = "./output/cloned_voices" // 默认输出目录
+		outputDir = "data/cloned_voices" // 默认输出目录（相对于项目根）
 	}
 
 	if err := os.MkdirAll(outputDir, 0755); err != nil {

@@ -331,13 +331,17 @@ func (x *PolishResponse) GetPolishedText() string {
 
 // 翻译请求
 type TranslateRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Text          string                 `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`                               // 原始文本
-	SourceLang    string                 `protobuf:"bytes,2,opt,name=source_lang,json=sourceLang,proto3" json:"source_lang,omitempty"` // 源语言（默认 en）
-	TargetLang    string                 `protobuf:"bytes,3,opt,name=target_lang,json=targetLang,proto3" json:"target_lang,omitempty"` // 目标语言（默认 zh）
-	VideoType     string                 `protobuf:"bytes,4,opt,name=video_type,json=videoType,proto3" json:"video_type,omitempty"`    // 视频类型（professional_tech, casual_natural, educational_rigorous, default）
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Text            string                 `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`                                                // ԭʼ�ı�
+	SourceLang      string                 `protobuf:"bytes,2,opt,name=source_lang,json=sourceLang,proto3" json:"source_lang,omitempty"`                  // Դ���ԣ�Ĭ�� en��
+	TargetLang      string                 `protobuf:"bytes,3,opt,name=target_lang,json=targetLang,proto3" json:"target_lang,omitempty"`                  // Ŀ�����ԣ�Ĭ�� zh��
+	VideoType       string                 `protobuf:"bytes,4,opt,name=video_type,json=videoType,proto3" json:"video_type,omitempty"`                     // ��Ƶ���ͣ�professional_tech, casual_natural, educational_rigorous, default��
+	DurationSeconds float64                `protobuf:"fixed64,5,opt,name=duration_seconds,json=durationSeconds,proto3" json:"duration_seconds,omitempty"` // ��Ӧԭ�����ʱ��(��)
+	SpeakerRole     string                 `protobuf:"bytes,6,opt,name=speaker_role,json=speakerRole,proto3" json:"speaker_role,omitempty"`               // ˵��������ɫ/����
+	TargetWordMin   uint32                 `protobuf:"varint,7,opt,name=target_word_min,json=targetWordMin,proto3" json:"target_word_min,omitempty"`      // Ԥ��͵�������
+	TargetWordMax   uint32                 `protobuf:"varint,8,opt,name=target_word_max,json=targetWordMax,proto3" json:"target_word_max,omitempty"`      // Ԥ��ߵ�������
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *TranslateRequest) Reset() {
@@ -398,7 +402,34 @@ func (x *TranslateRequest) GetVideoType() string {
 	return ""
 }
 
-// 翻译响应
+func (x *TranslateRequest) GetDurationSeconds() float64 {
+	if x != nil {
+		return x.DurationSeconds
+	}
+	return 0
+}
+
+func (x *TranslateRequest) GetSpeakerRole() string {
+	if x != nil {
+		return x.SpeakerRole
+	}
+	return ""
+}
+
+func (x *TranslateRequest) GetTargetWordMin() uint32 {
+	if x != nil {
+		return x.TargetWordMin
+	}
+	return 0
+}
+
+func (x *TranslateRequest) GetTargetWordMax() uint32 {
+	if x != nil {
+		return x.TargetWordMax
+	}
+	return 0
+}
+
 type TranslateResponse struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	TranslatedText string                 `protobuf:"bytes,1,opt,name=translated_text,json=translatedText,proto3" json:"translated_text,omitempty"` // 翻译后的文本
@@ -445,10 +476,15 @@ func (x *TranslateResponse) GetTranslatedText() string {
 
 // 译文优化请求
 type OptimizeRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Text          string                 `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"` // 翻译后的文本
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	Text                  string                 `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`                                                                    // �������ı�
+	TargetDurationSeconds float64                `protobuf:"fixed64,2,opt,name=target_duration_seconds,json=targetDurationSeconds,proto3" json:"target_duration_seconds,omitempty"` // ���ĳ���ʱ�䣨�룩
+	TargetWordMin         uint32                 `protobuf:"varint,3,opt,name=target_word_min,json=targetWordMin,proto3" json:"target_word_min,omitempty"`                          // Ԥ��͵�������
+	TargetWordMax         uint32                 `protobuf:"varint,4,opt,name=target_word_max,json=targetWordMax,proto3" json:"target_word_max,omitempty"`                          // Ԥ��ߵ�������
+	SpeakerRole           string                 `protobuf:"bytes,5,opt,name=speaker_role,json=speakerRole,proto3" json:"speaker_role,omitempty"`                                   // ˵��������ɫ/����
+	VideoType             string                 `protobuf:"bytes,6,opt,name=video_type,json=videoType,proto3" json:"video_type,omitempty"`                                         // ��Ƶ����Ϣ�������������
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *OptimizeRequest) Reset() {
@@ -488,7 +524,41 @@ func (x *OptimizeRequest) GetText() string {
 	return ""
 }
 
-// 译文优化响应
+func (x *OptimizeRequest) GetTargetDurationSeconds() float64 {
+	if x != nil {
+		return x.TargetDurationSeconds
+	}
+	return 0
+}
+
+func (x *OptimizeRequest) GetTargetWordMin() uint32 {
+	if x != nil {
+		return x.TargetWordMin
+	}
+	return 0
+}
+
+func (x *OptimizeRequest) GetTargetWordMax() uint32 {
+	if x != nil {
+		return x.TargetWordMax
+	}
+	return 0
+}
+
+func (x *OptimizeRequest) GetSpeakerRole() string {
+	if x != nil {
+		return x.SpeakerRole
+	}
+	return ""
+}
+
+func (x *OptimizeRequest) GetVideoType() string {
+	if x != nil {
+		return x.VideoType
+	}
+	return ""
+}
+
 type OptimizeResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	OptimizedText string                 `protobuf:"bytes,1,opt,name=optimized_text,json=optimizedText,proto3" json:"optimized_text,omitempty"` // 优化后的文本
@@ -665,7 +735,7 @@ const file_proto_aiadaptor_proto_rawDesc = "" +
 	"video_type\x18\x02 \x01(\tR\tvideoType\x12#\n" +
 	"\rcustom_prompt\x18\x03 \x01(\tR\fcustomPrompt\"5\n" +
 	"\x0ePolishResponse\x12#\n" +
-	"\rpolished_text\x18\x01 \x01(\tR\fpolishedText\"\x87\x01\n" +
+	"\rpolished_text\x18\x01 \x01(\tR\fpolishedText\"\xa5\x02\n" +
 	"\x10TranslateRequest\x12\x12\n" +
 	"\x04text\x18\x01 \x01(\tR\x04text\x12\x1f\n" +
 	"\vsource_lang\x18\x02 \x01(\tR\n" +
@@ -673,11 +743,21 @@ const file_proto_aiadaptor_proto_rawDesc = "" +
 	"\vtarget_lang\x18\x03 \x01(\tR\n" +
 	"targetLang\x12\x1d\n" +
 	"\n" +
-	"video_type\x18\x04 \x01(\tR\tvideoType\"<\n" +
+	"video_type\x18\x04 \x01(\tR\tvideoType\x12)\n" +
+	"\x10duration_seconds\x18\x05 \x01(\x01R\x0fdurationSeconds\x12!\n" +
+	"\fspeaker_role\x18\x06 \x01(\tR\vspeakerRole\x12&\n" +
+	"\x0ftarget_word_min\x18\a \x01(\rR\rtargetWordMin\x12&\n" +
+	"\x0ftarget_word_max\x18\b \x01(\rR\rtargetWordMax\"<\n" +
 	"\x11TranslateResponse\x12'\n" +
-	"\x0ftranslated_text\x18\x01 \x01(\tR\x0etranslatedText\"%\n" +
+	"\x0ftranslated_text\x18\x01 \x01(\tR\x0etranslatedText\"\xef\x01\n" +
 	"\x0fOptimizeRequest\x12\x12\n" +
-	"\x04text\x18\x01 \x01(\tR\x04text\"9\n" +
+	"\x04text\x18\x01 \x01(\tR\x04text\x126\n" +
+	"\x17target_duration_seconds\x18\x02 \x01(\x01R\x15targetDurationSeconds\x12&\n" +
+	"\x0ftarget_word_min\x18\x03 \x01(\rR\rtargetWordMin\x12&\n" +
+	"\x0ftarget_word_max\x18\x04 \x01(\rR\rtargetWordMax\x12!\n" +
+	"\fspeaker_role\x18\x05 \x01(\tR\vspeakerRole\x12\x1d\n" +
+	"\n" +
+	"video_type\x18\x06 \x01(\tR\tvideoType\"9\n" +
 	"\x10OptimizeResponse\x12%\n" +
 	"\x0eoptimized_text\x18\x01 \x01(\tR\roptimizedText\"o\n" +
 	"\x11CloneVoiceRequest\x12\x1d\n" +

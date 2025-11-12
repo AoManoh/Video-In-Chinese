@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"time"
 
+	"video-in-chinese/server/mcp/ai_adaptor/internal/adapters"
 	"video-in-chinese/server/mcp/ai_adaptor/internal/utils"
 )
 
@@ -165,7 +166,7 @@ func (g *GeminiLLMAdapter) Polish(text, videoType, customPrompt, modelName, apiK
 
 	// 步骤 2: 构建 Prompt
 	systemPrompt := buildPolishPrompt(videoType, customPrompt)
-	userPrompt := fmt.Sprintf("请润色以下文本：\n\n%s", text)
+	userPrompt := fmt.Sprintf("Correct the following ASR transcription:\n\n%s", text)
 
 	// 步骤 3: 调用 Gemini API
 	polishedText, err := g.callGeminiAPI(systemPrompt, userPrompt, apiKey, endpoint)
@@ -202,22 +203,14 @@ func (g *GeminiLLMAdapter) Polish(text, videoType, customPrompt, modelName, apiK
 //
 // 注意事项:
 //   - 任务需满足 Gemini 模型的 Token 限制，建议调用方控制输入长度。
-func (g *GeminiLLMAdapter) Optimize(text, modelName, apiKey, endpoint string) (string, error) {
+func (g *GeminiLLMAdapter) Optimize(text, modelName, apiKey, endpoint string, ctx *adapters.OptimizationContext) (string, error) {
 	log.Printf("[GeminiLLMAdapter] Starting translation optimization: model=%s", modelName)
 
-	// 注意：Gemini 适配器忽略 modelName 参数，因为模型在 URL 中指定
-	// 如果需要支持不同模型，应在 endpoint 中包含模型名称
-
-	// 步骤 1: 验证输入参数
 	if text == "" {
-		return "", fmt.Errorf("待优化的文本不能为空")
+		return "", fmt.Errorf("要优化的文本不能为空")
 	}
 
-	// 步骤 2: 构建 Prompt
-	systemPrompt := "你是一位专业的翻译优化专家。请优化以下翻译文本，使其更加流畅、自然、符合中文表达习惯。保持原意不变，只优化表达方式。"
-	userPrompt := fmt.Sprintf("请优化以下翻译文本：\n\n%s", text)
-
-	// 步骤 3: 调用 Gemini API
+	systemPrompt, userPrompt := buildOptimizationPrompts(text, ctx)
 	optimizedText, err := g.callGeminiAPI(systemPrompt, userPrompt, apiKey, endpoint)
 	if err != nil {
 		return "", fmt.Errorf("调用 Gemini API 失败: %w", err)
@@ -402,15 +395,29 @@ func buildPolishPrompt(videoType, customPrompt string) string {
 	}
 
 	// 根据视频类型构建默认 Prompt
-	basePrompt := "你是一位专业的文本润色专家。请润色以下文本，使其更加流畅、自然、符合表达习惯。保持原意不变，只优化表达方式。\n\n重要：请直接返回润色后的文本，不要添加任何解释、说明或多个方案。"
+	basePrompt := `You are a professional ASR (Automatic Speech Recognition) text correction expert. Your task is to correct ONLY the misrecognized words in the transcribed text while preserving the speaker's original expression style.
+
+CRITICAL RULES:
+1. ONLY fix obvious ASR errors (misheard words, typos, wrong homophones)
+2. PRESERVE the speaker's original grammar, sentence structure, and word choice
+3. DO NOT rephrase, restructure, or "improve" the text
+4. DO NOT change casual expressions to formal ones (e.g., "OK" should stay "OK", NOT "I am okay")
+5. KEEP the same language as the input (English input → English output, Chinese input → Chinese output)
+6. Return ONLY the corrected text without any explanations or notes
+
+Examples:
+- Input: "barconstrictor" → Output: "boa constrictor" (fix misrecognized word)
+- Input: "OK" → Output: "OK" (keep as is, do NOT change to "I am okay")
+- Input: "gonna" → Output: "gonna" (keep casual speech as is)
+- Input: "Welin their prey" → Output: "swallow their prey" (fix obvious error)`
 
 	switch videoType {
 	case "professional_tech":
-		return basePrompt + "\n\n特别要求：保持专业术语的准确性，使用正式的技术文档风格。"
+		return basePrompt + "\n\nAdditional requirement: Ensure technical terms are correctly spelled and accurate."
 	case "casual_natural":
-		return basePrompt + "\n\n特别要求：使用轻松、自然的口语化表达，避免过于正式的用词。"
+		return basePrompt + "\n\nAdditional requirement: Preserve casual, conversational tone. Do NOT formalize the language."
 	case "educational_rigorous":
-		return basePrompt + "\n\n特别要求：保持严谨的学术风格，确保逻辑清晰、表达准确。"
+		return basePrompt + "\n\nAdditional requirement: Ensure academic terminology is correctly spelled while preserving the speaker's teaching style."
 	default:
 		return basePrompt
 	}

@@ -28,19 +28,19 @@ func (m *MockASRAdapter) ASR(audioPath, apiKey, endpoint string) ([]*pb.Speaker,
 // MockTranslationAdapter 模拟翻译适配器
 type MockTranslationAdapter struct{}
 
-func (m *MockTranslationAdapter) Translate(text, sourceLang, targetLang, videoType, apiKey, endpoint string) (string, error) {
-	return "你好世界", nil
+func (m *MockTranslationAdapter) Translate(text, sourceLang, targetLang, videoType, modelName, apiKey, endpoint string, ctx *adapters.TranslationContext) (string, error) {
+	return "模拟翻译", nil
 }
 
 // MockLLMAdapter 模拟 LLM 适配器
 type MockLLMAdapter struct{}
 
-func (m *MockLLMAdapter) Polish(text, videoType, customPrompt, apiKey, endpoint string) (string, error) {
-	return "Polished: " + text, nil
+func (m *MockLLMAdapter) Polish(text, videoType, customPrompt, modelName, apiKey, endpoint string) (string, error) {
+	return "润色文本", nil
 }
 
-func (m *MockLLMAdapter) Optimize(text, apiKey, endpoint string) (string, error) {
-	return "Optimized: " + text, nil
+func (m *MockLLMAdapter) Optimize(text, modelName, apiKey, endpoint string, ctx *adapters.OptimizationContext) (string, error) {
+	return "优化文本", nil
 }
 
 // MockVoiceCloningAdapter 模拟声音克隆适配器

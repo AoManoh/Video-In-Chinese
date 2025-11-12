@@ -372,29 +372,29 @@ func (vm *VoiceManager) PollVoiceStatus(ctx context.Context, voiceID, apiKey, en
 				continue
 			}
 
-		log.Printf("[VoiceManager] Voice status: voice_id=%s, status=%s", voiceID, status)
+			log.Printf("[VoiceManager] Voice status: voice_id=%s, status=%s", voiceID, status)
 
-		switch status {
-		case "OK":
-			// 音色可用（审核通过）
-			log.Printf("[VoiceManager] Voice registration completed: voice_id=%s", voiceID)
-			return nil
+			switch status {
+			case "OK":
+				// 音色可用（审核通过）
+				log.Printf("[VoiceManager] Voice registration completed: voice_id=%s", voiceID)
+				return nil
 
-		case "DEPLOYING":
-			// 音色审核中，继续轮询
-			log.Printf("[VoiceManager] Voice is deploying, continue polling: voice_id=%s", voiceID)
-			continue
+			case "DEPLOYING":
+				// 音色审核中，继续轮询
+				log.Printf("[VoiceManager] Voice is deploying, continue polling: voice_id=%s", voiceID)
+				continue
 
-		case "UNDEPLOYED":
-			// 音色不可用（审核未通过或已下线）
-			log.Printf("[VoiceManager] ERROR: Voice is undeployed: voice_id=%s", voiceID)
-			return fmt.Errorf("voice registration failed: status=UNDEPLOYED")
+			case "UNDEPLOYED":
+				// 音色不可用（审核未通过或已下线）
+				log.Printf("[VoiceManager] ERROR: Voice is undeployed: voice_id=%s", voiceID)
+				return fmt.Errorf("voice registration failed: status=UNDEPLOYED")
 
-		default:
-			// 未知状态，记录警告并继续轮询
-			log.Printf("[VoiceManager] WARNING: Unknown voice status: voice_id=%s, status=%s", voiceID, status)
-			continue
-		}
+			default:
+				// 未知状态，记录警告并继续轮询
+				log.Printf("[VoiceManager] WARNING: Unknown voice status: voice_id=%s, status=%s", voiceID, status)
+				continue
+			}
 		}
 	}
 }

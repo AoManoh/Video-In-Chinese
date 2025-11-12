@@ -4,6 +4,23 @@ import (
 	pb "video-in-chinese/server/mcp/ai_adaptor/proto"
 )
 
+// TranslationContext 描述翻译阶段的额外约束，例如朗读时长、角色和字数范围。
+type TranslationContext struct {
+	DurationSeconds float64
+	SpeakerRole     string
+	TargetWordMin   uint32
+	TargetWordMax   uint32
+}
+
+// OptimizationContext 描述译文优化阶段的长度控制和风格偏好。
+type OptimizationContext struct {
+	TargetDurationSeconds float64
+	TargetWordMin         uint32
+	TargetWordMax         uint32
+	SpeakerRole           string
+	VideoType             string
+}
+
 // ASRAdapter 定义了统一的语音识别适配器抽象，封装各厂商 API 的调用差异并向业务层提供稳定的 gRPC 行为。
 //
 // 功能说明:
@@ -110,13 +127,15 @@ type TranslationAdapter interface {
 	//   - 根据视频类型调整翻译语气，保持字幕风格一致。
 	// 设计决策:
 	//   - 参数明确区分源语言和目标语言，防止调用歧义。
+	//   - 支持传入模型名称，允许使用不同的翻译模型。
 	// 使用示例:
-	//   translated, err := adapter.Translate(script, "en", "zh", "default", key, "")
+	//   translated, err := adapter.Translate(script, "en", "zh", "default", "gemini-2.5-flash-lite", key, "")
 	// 参数说明:
 	//   text string: 原始文本。
 	//   sourceLang string: 源语言代码。
 	//   targetLang string: 目标语言代码。
 	//   videoType string: 视频风格标签。
+	//   modelName string: 翻译模型名称（如 "gemini-2.5-flash-lite", "gpt-4o"），某些适配器可能忽略此参数。
 	//   apiKey string: 供应商密钥。
 	//   endpoint string: 可选 API 地址。
 	// 返回值说明:
@@ -126,7 +145,7 @@ type TranslationAdapter interface {
 	//   - 将供应商错误透传给调用方以便记录和报警。
 	// 注意事项:
 	//   - 长文本任务建议调用方拆分并在外层聚合结果。
-	Translate(text, sourceLang, targetLang, videoType, apiKey, endpoint string) (string, error)
+	Translate(text, sourceLang, targetLang, videoType, modelName, apiKey, endpoint string, ctx *TranslationContext) (string, error)
 }
 
 // LLMAdapter 定义了大模型在润色和文本优化场景下的统一接口，方便业务层在不同供应商之间切换而不改动编排逻辑。
@@ -210,7 +229,7 @@ type LLMAdapter interface {
 	//   - 将供应商的错误码原样返回，由业务逻辑决定是否降级。
 	// 注意事项:
 	//   - 建议调用方在外层切片长文本，以免超出模型限制。
-	Optimize(text, modelName, apiKey, endpoint string) (string, error)
+	Optimize(text, modelName, apiKey, endpoint string, ctx *OptimizationContext) (string, error)
 }
 
 // VoiceCloningAdapter 抽象了语音克隆服务能力，使业务层可以重用 VoiceCache 并在供应商间自由切换。

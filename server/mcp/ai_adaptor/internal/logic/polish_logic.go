@@ -125,7 +125,7 @@ func (l *PolishLogic) ProcessPolish(ctx context.Context, req *pb.PolishRequest) 
 	// 获取模型名称，如果未配置则使用默认值
 	modelName := appConfig.PolishingModelName
 	if modelName == "" {
-		modelName = "gemini-2.5-flash" // 默认使用 Gemini Flash（更快）
+		modelName = "gemini-2.5-flash-lite" // 默认使用 Gemini Flash（更快）
 		log.Printf("[PolishLogic] WARNING: No model specified, using default: %s", modelName)
 	}
 

@@ -19,7 +19,7 @@ TaskRpcConf:
 
 # File storage configuration
 TempStoragePath: ./data/temp
-LocalStoragePath: ./data/videos
+LocalStoragePath: ../../data/videos
 
 # Upload configuration
 MaxUploadSizeMB: 2048

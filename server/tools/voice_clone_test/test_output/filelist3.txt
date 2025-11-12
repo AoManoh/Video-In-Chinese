@@ -1,0 +1,3 @@
+﻿file 'D:/Go-Project/video-In-Chinese/server\data\videos\d9cdea5d-0f00-43b2-8be7-7c298b2b6a91\intermediate/speaker_speaker_0_segment_0.wav'
+file 'D:/Go-Project/video-In-Chinese/server\data\videos\d9cdea5d-0f00-43b2-8be7-7c298b2b6a91\intermediate/speaker_speaker_0_segment_1.wav'
+file 'D:/Go-Project/video-In-Chinese/server\data\videos\d9cdea5d-0f00-43b2-8be7-7c298b2b6a91\intermediate/speaker_speaker_0_segment_2.wav'

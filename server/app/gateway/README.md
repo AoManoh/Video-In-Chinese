@@ -129,7 +129,7 @@ TASK_RPC_ENDPOINTS=127.0.0.1:50050
 
 # 文件存储路径
 TEMP_STORAGE_PATH=./data/temp
-LOCAL_STORAGE_PATH=./data/videos
+LOCAL_STORAGE_PATH=../../data/videos  # keep in sync with processor/task services
 
 # 上传限制
 MAX_UPLOAD_SIZE_MB=2048
@@ -311,4 +311,3 @@ MIT License
 
 - 项目地址: https://github.com/your-org/video-In-Chinese
 - 问题反馈: https://github.com/your-org/video-In-Chinese/issues
-

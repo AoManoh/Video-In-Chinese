@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.10
 // 	protoc        v3.19.4
-// source: pb/aiadaptor.proto
+// source: proto/aiadaptor.proto
 
 package proto
 
@@ -31,7 +31,7 @@ type ASRRequest struct {
 
 func (x *ASRRequest) Reset() {
 	*x = ASRRequest{}
-	mi := &file_pb_aiadaptor_proto_msgTypes[0]
+	mi := &file_proto_aiadaptor_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -43,7 +43,7 @@ func (x *ASRRequest) String() string {
 func (*ASRRequest) ProtoMessage() {}
 
 func (x *ASRRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pb_aiadaptor_proto_msgTypes[0]
+	mi := &file_proto_aiadaptor_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -56,7 +56,7 @@ func (x *ASRRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ASRRequest.ProtoReflect.Descriptor instead.
 func (*ASRRequest) Descriptor() ([]byte, []int) {
-	return file_pb_aiadaptor_proto_rawDescGZIP(), []int{0}
+	return file_proto_aiadaptor_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *ASRRequest) GetAudioPath() string {
@@ -76,7 +76,7 @@ type ASRResponse struct {
 
 func (x *ASRResponse) Reset() {
 	*x = ASRResponse{}
-	mi := &file_pb_aiadaptor_proto_msgTypes[1]
+	mi := &file_proto_aiadaptor_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -88,7 +88,7 @@ func (x *ASRResponse) String() string {
 func (*ASRResponse) ProtoMessage() {}
 
 func (x *ASRResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_pb_aiadaptor_proto_msgTypes[1]
+	mi := &file_proto_aiadaptor_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -101,7 +101,7 @@ func (x *ASRResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ASRResponse.ProtoReflect.Descriptor instead.
 func (*ASRResponse) Descriptor() ([]byte, []int) {
-	return file_pb_aiadaptor_proto_rawDescGZIP(), []int{1}
+	return file_proto_aiadaptor_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *ASRResponse) GetSpeakers() []*Speaker {
@@ -121,7 +121,7 @@ type Speaker struct {
 
 func (x *Speaker) Reset() {
 	*x = Speaker{}
-	mi := &file_pb_aiadaptor_proto_msgTypes[2]
+	mi := &file_proto_aiadaptor_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -133,7 +133,7 @@ func (x *Speaker) String() string {
 func (*Speaker) ProtoMessage() {}
 
 func (x *Speaker) ProtoReflect() protoreflect.Message {
-	mi := &file_pb_aiadaptor_proto_msgTypes[2]
+	mi := &file_proto_aiadaptor_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -146,7 +146,7 @@ func (x *Speaker) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Speaker.ProtoReflect.Descriptor instead.
 func (*Speaker) Descriptor() ([]byte, []int) {
-	return file_pb_aiadaptor_proto_rawDescGZIP(), []int{2}
+	return file_proto_aiadaptor_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *Speaker) GetSpeakerId() string {
@@ -174,7 +174,7 @@ type Sentence struct {
 
 func (x *Sentence) Reset() {
 	*x = Sentence{}
-	mi := &file_pb_aiadaptor_proto_msgTypes[3]
+	mi := &file_proto_aiadaptor_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -186,7 +186,7 @@ func (x *Sentence) String() string {
 func (*Sentence) ProtoMessage() {}
 
 func (x *Sentence) ProtoReflect() protoreflect.Message {
-	mi := &file_pb_aiadaptor_proto_msgTypes[3]
+	mi := &file_proto_aiadaptor_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -199,7 +199,7 @@ func (x *Sentence) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Sentence.ProtoReflect.Descriptor instead.
 func (*Sentence) Descriptor() ([]byte, []int) {
-	return file_pb_aiadaptor_proto_rawDescGZIP(), []int{3}
+	return file_proto_aiadaptor_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *Sentence) GetText() string {
@@ -235,7 +235,7 @@ type PolishRequest struct {
 
 func (x *PolishRequest) Reset() {
 	*x = PolishRequest{}
-	mi := &file_pb_aiadaptor_proto_msgTypes[4]
+	mi := &file_proto_aiadaptor_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -247,7 +247,7 @@ func (x *PolishRequest) String() string {
 func (*PolishRequest) ProtoMessage() {}
 
 func (x *PolishRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pb_aiadaptor_proto_msgTypes[4]
+	mi := &file_proto_aiadaptor_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -260,7 +260,7 @@ func (x *PolishRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PolishRequest.ProtoReflect.Descriptor instead.
 func (*PolishRequest) Descriptor() ([]byte, []int) {
-	return file_pb_aiadaptor_proto_rawDescGZIP(), []int{4}
+	return file_proto_aiadaptor_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *PolishRequest) GetText() string {
@@ -294,7 +294,7 @@ type PolishResponse struct {
 
 func (x *PolishResponse) Reset() {
 	*x = PolishResponse{}
-	mi := &file_pb_aiadaptor_proto_msgTypes[5]
+	mi := &file_proto_aiadaptor_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -306,7 +306,7 @@ func (x *PolishResponse) String() string {
 func (*PolishResponse) ProtoMessage() {}
 
 func (x *PolishResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_pb_aiadaptor_proto_msgTypes[5]
+	mi := &file_proto_aiadaptor_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -319,7 +319,7 @@ func (x *PolishResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PolishResponse.ProtoReflect.Descriptor instead.
 func (*PolishResponse) Descriptor() ([]byte, []int) {
-	return file_pb_aiadaptor_proto_rawDescGZIP(), []int{5}
+	return file_proto_aiadaptor_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *PolishResponse) GetPolishedText() string {
@@ -331,18 +331,22 @@ func (x *PolishResponse) GetPolishedText() string {
 
 // 翻译请求
 type TranslateRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Text          string                 `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`                               // 原始文本
-	SourceLang    string                 `protobuf:"bytes,2,opt,name=source_lang,json=sourceLang,proto3" json:"source_lang,omitempty"` // 源语言（默认 en）
-	TargetLang    string                 `protobuf:"bytes,3,opt,name=target_lang,json=targetLang,proto3" json:"target_lang,omitempty"` // 目标语言（默认 zh）
-	VideoType     string                 `protobuf:"bytes,4,opt,name=video_type,json=videoType,proto3" json:"video_type,omitempty"`    // 视频类型（professional_tech, casual_natural, educational_rigorous, default）
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Text            string                 `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`                                                // ԭʼ�ı�
+	SourceLang      string                 `protobuf:"bytes,2,opt,name=source_lang,json=sourceLang,proto3" json:"source_lang,omitempty"`                  // Դ���ԣ�Ĭ�� en��
+	TargetLang      string                 `protobuf:"bytes,3,opt,name=target_lang,json=targetLang,proto3" json:"target_lang,omitempty"`                  // Ŀ�����ԣ�Ĭ�� zh��
+	VideoType       string                 `protobuf:"bytes,4,opt,name=video_type,json=videoType,proto3" json:"video_type,omitempty"`                     // ��Ƶ���ͣ�professional_tech, casual_natural, educational_rigorous, default��
+	DurationSeconds float64                `protobuf:"fixed64,5,opt,name=duration_seconds,json=durationSeconds,proto3" json:"duration_seconds,omitempty"` // ��Ӧԭ�����ʱ��(��)
+	SpeakerRole     string                 `protobuf:"bytes,6,opt,name=speaker_role,json=speakerRole,proto3" json:"speaker_role,omitempty"`               // ˵��������ɫ/����
+	TargetWordMin   uint32                 `protobuf:"varint,7,opt,name=target_word_min,json=targetWordMin,proto3" json:"target_word_min,omitempty"`      // Ԥ��͵�������
+	TargetWordMax   uint32                 `protobuf:"varint,8,opt,name=target_word_max,json=targetWordMax,proto3" json:"target_word_max,omitempty"`      // Ԥ��ߵ�������
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *TranslateRequest) Reset() {
 	*x = TranslateRequest{}
-	mi := &file_pb_aiadaptor_proto_msgTypes[6]
+	mi := &file_proto_aiadaptor_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -354,7 +358,7 @@ func (x *TranslateRequest) String() string {
 func (*TranslateRequest) ProtoMessage() {}
 
 func (x *TranslateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pb_aiadaptor_proto_msgTypes[6]
+	mi := &file_proto_aiadaptor_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -367,7 +371,7 @@ func (x *TranslateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TranslateRequest.ProtoReflect.Descriptor instead.
 func (*TranslateRequest) Descriptor() ([]byte, []int) {
-	return file_pb_aiadaptor_proto_rawDescGZIP(), []int{6}
+	return file_proto_aiadaptor_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *TranslateRequest) GetText() string {
@@ -398,7 +402,34 @@ func (x *TranslateRequest) GetVideoType() string {
 	return ""
 }
 
-// 翻译响应
+func (x *TranslateRequest) GetDurationSeconds() float64 {
+	if x != nil {
+		return x.DurationSeconds
+	}
+	return 0
+}
+
+func (x *TranslateRequest) GetSpeakerRole() string {
+	if x != nil {
+		return x.SpeakerRole
+	}
+	return ""
+}
+
+func (x *TranslateRequest) GetTargetWordMin() uint32 {
+	if x != nil {
+		return x.TargetWordMin
+	}
+	return 0
+}
+
+func (x *TranslateRequest) GetTargetWordMax() uint32 {
+	if x != nil {
+		return x.TargetWordMax
+	}
+	return 0
+}
+
 type TranslateResponse struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	TranslatedText string                 `protobuf:"bytes,1,opt,name=translated_text,json=translatedText,proto3" json:"translated_text,omitempty"` // 翻译后的文本
@@ -408,7 +439,7 @@ type TranslateResponse struct {
 
 func (x *TranslateResponse) Reset() {
 	*x = TranslateResponse{}
-	mi := &file_pb_aiadaptor_proto_msgTypes[7]
+	mi := &file_proto_aiadaptor_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -420,7 +451,7 @@ func (x *TranslateResponse) String() string {
 func (*TranslateResponse) ProtoMessage() {}
 
 func (x *TranslateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_pb_aiadaptor_proto_msgTypes[7]
+	mi := &file_proto_aiadaptor_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -433,7 +464,7 @@ func (x *TranslateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TranslateResponse.ProtoReflect.Descriptor instead.
 func (*TranslateResponse) Descriptor() ([]byte, []int) {
-	return file_pb_aiadaptor_proto_rawDescGZIP(), []int{7}
+	return file_proto_aiadaptor_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *TranslateResponse) GetTranslatedText() string {
@@ -445,15 +476,20 @@ func (x *TranslateResponse) GetTranslatedText() string {
 
 // 译文优化请求
 type OptimizeRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Text          string                 `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"` // 翻译后的文本
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	Text                  string                 `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`                                                                    // �������ı�
+	TargetDurationSeconds float64                `protobuf:"fixed64,2,opt,name=target_duration_seconds,json=targetDurationSeconds,proto3" json:"target_duration_seconds,omitempty"` // ���ĳ���ʱ�䣨�룩
+	TargetWordMin         uint32                 `protobuf:"varint,3,opt,name=target_word_min,json=targetWordMin,proto3" json:"target_word_min,omitempty"`                          // Ԥ��͵�������
+	TargetWordMax         uint32                 `protobuf:"varint,4,opt,name=target_word_max,json=targetWordMax,proto3" json:"target_word_max,omitempty"`                          // Ԥ��ߵ�������
+	SpeakerRole           string                 `protobuf:"bytes,5,opt,name=speaker_role,json=speakerRole,proto3" json:"speaker_role,omitempty"`                                   // ˵��������ɫ/����
+	VideoType             string                 `protobuf:"bytes,6,opt,name=video_type,json=videoType,proto3" json:"video_type,omitempty"`                                         // ��Ƶ����Ϣ�������������
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *OptimizeRequest) Reset() {
 	*x = OptimizeRequest{}
-	mi := &file_pb_aiadaptor_proto_msgTypes[8]
+	mi := &file_proto_aiadaptor_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -465,7 +501,7 @@ func (x *OptimizeRequest) String() string {
 func (*OptimizeRequest) ProtoMessage() {}
 
 func (x *OptimizeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pb_aiadaptor_proto_msgTypes[8]
+	mi := &file_proto_aiadaptor_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -478,7 +514,7 @@ func (x *OptimizeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OptimizeRequest.ProtoReflect.Descriptor instead.
 func (*OptimizeRequest) Descriptor() ([]byte, []int) {
-	return file_pb_aiadaptor_proto_rawDescGZIP(), []int{8}
+	return file_proto_aiadaptor_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *OptimizeRequest) GetText() string {
@@ -488,7 +524,41 @@ func (x *OptimizeRequest) GetText() string {
 	return ""
 }
 
-// 译文优化响应
+func (x *OptimizeRequest) GetTargetDurationSeconds() float64 {
+	if x != nil {
+		return x.TargetDurationSeconds
+	}
+	return 0
+}
+
+func (x *OptimizeRequest) GetTargetWordMin() uint32 {
+	if x != nil {
+		return x.TargetWordMin
+	}
+	return 0
+}
+
+func (x *OptimizeRequest) GetTargetWordMax() uint32 {
+	if x != nil {
+		return x.TargetWordMax
+	}
+	return 0
+}
+
+func (x *OptimizeRequest) GetSpeakerRole() string {
+	if x != nil {
+		return x.SpeakerRole
+	}
+	return ""
+}
+
+func (x *OptimizeRequest) GetVideoType() string {
+	if x != nil {
+		return x.VideoType
+	}
+	return ""
+}
+
 type OptimizeResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	OptimizedText string                 `protobuf:"bytes,1,opt,name=optimized_text,json=optimizedText,proto3" json:"optimized_text,omitempty"` // 优化后的文本
@@ -498,7 +568,7 @@ type OptimizeResponse struct {
 
 func (x *OptimizeResponse) Reset() {
 	*x = OptimizeResponse{}
-	mi := &file_pb_aiadaptor_proto_msgTypes[9]
+	mi := &file_proto_aiadaptor_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -510,7 +580,7 @@ func (x *OptimizeResponse) String() string {
 func (*OptimizeResponse) ProtoMessage() {}
 
 func (x *OptimizeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_pb_aiadaptor_proto_msgTypes[9]
+	mi := &file_proto_aiadaptor_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -523,7 +593,7 @@ func (x *OptimizeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OptimizeResponse.ProtoReflect.Descriptor instead.
 func (*OptimizeResponse) Descriptor() ([]byte, []int) {
-	return file_pb_aiadaptor_proto_rawDescGZIP(), []int{9}
+	return file_proto_aiadaptor_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *OptimizeResponse) GetOptimizedText() string {
@@ -545,7 +615,7 @@ type CloneVoiceRequest struct {
 
 func (x *CloneVoiceRequest) Reset() {
 	*x = CloneVoiceRequest{}
-	mi := &file_pb_aiadaptor_proto_msgTypes[10]
+	mi := &file_proto_aiadaptor_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -557,7 +627,7 @@ func (x *CloneVoiceRequest) String() string {
 func (*CloneVoiceRequest) ProtoMessage() {}
 
 func (x *CloneVoiceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pb_aiadaptor_proto_msgTypes[10]
+	mi := &file_proto_aiadaptor_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -570,7 +640,7 @@ func (x *CloneVoiceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CloneVoiceRequest.ProtoReflect.Descriptor instead.
 func (*CloneVoiceRequest) Descriptor() ([]byte, []int) {
-	return file_pb_aiadaptor_proto_rawDescGZIP(), []int{10}
+	return file_proto_aiadaptor_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *CloneVoiceRequest) GetSpeakerId() string {
@@ -604,7 +674,7 @@ type CloneVoiceResponse struct {
 
 func (x *CloneVoiceResponse) Reset() {
 	*x = CloneVoiceResponse{}
-	mi := &file_pb_aiadaptor_proto_msgTypes[11]
+	mi := &file_proto_aiadaptor_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -616,7 +686,7 @@ func (x *CloneVoiceResponse) String() string {
 func (*CloneVoiceResponse) ProtoMessage() {}
 
 func (x *CloneVoiceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_pb_aiadaptor_proto_msgTypes[11]
+	mi := &file_proto_aiadaptor_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -629,7 +699,7 @@ func (x *CloneVoiceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CloneVoiceResponse.ProtoReflect.Descriptor instead.
 func (*CloneVoiceResponse) Descriptor() ([]byte, []int) {
-	return file_pb_aiadaptor_proto_rawDescGZIP(), []int{11}
+	return file_proto_aiadaptor_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *CloneVoiceResponse) GetAudioPath() string {
@@ -639,11 +709,11 @@ func (x *CloneVoiceResponse) GetAudioPath() string {
 	return ""
 }
 
-var File_pb_aiadaptor_proto protoreflect.FileDescriptor
+var File_proto_aiadaptor_proto protoreflect.FileDescriptor
 
-const file_pb_aiadaptor_proto_rawDesc = "" +
+const file_proto_aiadaptor_proto_rawDesc = "" +
 	"\n" +
-	"\x12pb/aiadaptor.proto\x12\taiadaptor\"+\n" +
+	"\x15proto/aiadaptor.proto\x12\taiadaptor\"+\n" +
 	"\n" +
 	"ASRRequest\x12\x1d\n" +
 	"\n" +
@@ -665,7 +735,7 @@ const file_pb_aiadaptor_proto_rawDesc = "" +
 	"video_type\x18\x02 \x01(\tR\tvideoType\x12#\n" +
 	"\rcustom_prompt\x18\x03 \x01(\tR\fcustomPrompt\"5\n" +
 	"\x0ePolishResponse\x12#\n" +
-	"\rpolished_text\x18\x01 \x01(\tR\fpolishedText\"\x87\x01\n" +
+	"\rpolished_text\x18\x01 \x01(\tR\fpolishedText\"\xa5\x02\n" +
 	"\x10TranslateRequest\x12\x12\n" +
 	"\x04text\x18\x01 \x01(\tR\x04text\x12\x1f\n" +
 	"\vsource_lang\x18\x02 \x01(\tR\n" +
@@ -673,11 +743,21 @@ const file_pb_aiadaptor_proto_rawDesc = "" +
 	"\vtarget_lang\x18\x03 \x01(\tR\n" +
 	"targetLang\x12\x1d\n" +
 	"\n" +
-	"video_type\x18\x04 \x01(\tR\tvideoType\"<\n" +
+	"video_type\x18\x04 \x01(\tR\tvideoType\x12)\n" +
+	"\x10duration_seconds\x18\x05 \x01(\x01R\x0fdurationSeconds\x12!\n" +
+	"\fspeaker_role\x18\x06 \x01(\tR\vspeakerRole\x12&\n" +
+	"\x0ftarget_word_min\x18\a \x01(\rR\rtargetWordMin\x12&\n" +
+	"\x0ftarget_word_max\x18\b \x01(\rR\rtargetWordMax\"<\n" +
 	"\x11TranslateResponse\x12'\n" +
-	"\x0ftranslated_text\x18\x01 \x01(\tR\x0etranslatedText\"%\n" +
+	"\x0ftranslated_text\x18\x01 \x01(\tR\x0etranslatedText\"\xef\x01\n" +
 	"\x0fOptimizeRequest\x12\x12\n" +
-	"\x04text\x18\x01 \x01(\tR\x04text\"9\n" +
+	"\x04text\x18\x01 \x01(\tR\x04text\x126\n" +
+	"\x17target_duration_seconds\x18\x02 \x01(\x01R\x15targetDurationSeconds\x12&\n" +
+	"\x0ftarget_word_min\x18\x03 \x01(\rR\rtargetWordMin\x12&\n" +
+	"\x0ftarget_word_max\x18\x04 \x01(\rR\rtargetWordMax\x12!\n" +
+	"\fspeaker_role\x18\x05 \x01(\tR\vspeakerRole\x12\x1d\n" +
+	"\n" +
+	"video_type\x18\x06 \x01(\tR\tvideoType\"9\n" +
 	"\x10OptimizeResponse\x12%\n" +
 	"\x0eoptimized_text\x18\x01 \x01(\tR\roptimizedText\"o\n" +
 	"\x11CloneVoiceRequest\x12\x1d\n" +
@@ -697,19 +777,19 @@ const file_pb_aiadaptor_proto_rawDesc = "" +
 	"CloneVoice\x12\x1c.aiadaptor.CloneVoiceRequest\x1a\x1d.aiadaptor.CloneVoiceResponseB\tZ\a./protob\x06proto3"
 
 var (
-	file_pb_aiadaptor_proto_rawDescOnce sync.Once
-	file_pb_aiadaptor_proto_rawDescData []byte
+	file_proto_aiadaptor_proto_rawDescOnce sync.Once
+	file_proto_aiadaptor_proto_rawDescData []byte
 )
 
-func file_pb_aiadaptor_proto_rawDescGZIP() []byte {
-	file_pb_aiadaptor_proto_rawDescOnce.Do(func() {
-		file_pb_aiadaptor_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_pb_aiadaptor_proto_rawDesc), len(file_pb_aiadaptor_proto_rawDesc)))
+func file_proto_aiadaptor_proto_rawDescGZIP() []byte {
+	file_proto_aiadaptor_proto_rawDescOnce.Do(func() {
+		file_proto_aiadaptor_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_proto_aiadaptor_proto_rawDesc), len(file_proto_aiadaptor_proto_rawDesc)))
 	})
-	return file_pb_aiadaptor_proto_rawDescData
+	return file_proto_aiadaptor_proto_rawDescData
 }
 
-var file_pb_aiadaptor_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
-var file_pb_aiadaptor_proto_goTypes = []any{
+var file_proto_aiadaptor_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_proto_aiadaptor_proto_goTypes = []any{
 	(*ASRRequest)(nil),         // 0: aiadaptor.ASRRequest
 	(*ASRResponse)(nil),        // 1: aiadaptor.ASRResponse
 	(*Speaker)(nil),            // 2: aiadaptor.Speaker
@@ -723,7 +803,7 @@ var file_pb_aiadaptor_proto_goTypes = []any{
 	(*CloneVoiceRequest)(nil),  // 10: aiadaptor.CloneVoiceRequest
 	(*CloneVoiceResponse)(nil), // 11: aiadaptor.CloneVoiceResponse
 }
-var file_pb_aiadaptor_proto_depIdxs = []int32{
+var file_proto_aiadaptor_proto_depIdxs = []int32{
 	2,  // 0: aiadaptor.ASRResponse.speakers:type_name -> aiadaptor.Speaker
 	3,  // 1: aiadaptor.Speaker.sentences:type_name -> aiadaptor.Sentence
 	0,  // 2: aiadaptor.AIAdaptor.ASR:input_type -> aiadaptor.ASRRequest
@@ -743,26 +823,26 @@ var file_pb_aiadaptor_proto_depIdxs = []int32{
 	0,  // [0:2] is the sub-list for field type_name
 }
 
-func init() { file_pb_aiadaptor_proto_init() }
-func file_pb_aiadaptor_proto_init() {
-	if File_pb_aiadaptor_proto != nil {
+func init() { file_proto_aiadaptor_proto_init() }
+func file_proto_aiadaptor_proto_init() {
+	if File_proto_aiadaptor_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pb_aiadaptor_proto_rawDesc), len(file_pb_aiadaptor_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_aiadaptor_proto_rawDesc), len(file_proto_aiadaptor_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_pb_aiadaptor_proto_goTypes,
-		DependencyIndexes: file_pb_aiadaptor_proto_depIdxs,
-		MessageInfos:      file_pb_aiadaptor_proto_msgTypes,
+		GoTypes:           file_proto_aiadaptor_proto_goTypes,
+		DependencyIndexes: file_proto_aiadaptor_proto_depIdxs,
+		MessageInfos:      file_proto_aiadaptor_proto_msgTypes,
 	}.Build()
-	File_pb_aiadaptor_proto = out.File
-	file_pb_aiadaptor_proto_goTypes = nil
-	file_pb_aiadaptor_proto_depIdxs = nil
+	File_proto_aiadaptor_proto = out.File
+	file_proto_aiadaptor_proto_goTypes = nil
+	file_proto_aiadaptor_proto_depIdxs = nil
 }

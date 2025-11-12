@@ -51,6 +51,7 @@ type AppConfig struct {
 	TranslationAPIKey    string
 	TranslationEndpoint  string
 	TranslationVideoType string
+	TranslationModelName string // LLM 模型名称（如 "gpt-4o", "gemini-2.5-flash-lite", "qwen-plus"）
 
 	// 文本润色配置
 	PolishingEnabled      bool
@@ -380,6 +381,7 @@ func (m *ConfigManager) parseConfig(settings map[string]string) (*AppConfig, err
 	}
 	config.TranslationEndpoint = settings["translation_endpoint"]
 	config.TranslationVideoType = settings["translation_video_type"]
+	config.TranslationModelName = settings["translation_model_name"]
 
 	// 解析文本润色配置
 	config.PolishingEnabled = settings["polishing_enabled"] == "true"
